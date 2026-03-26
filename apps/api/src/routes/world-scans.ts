@@ -1,41 +1,162 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { ScanPipelineService } from '../services/scan-pipeline.service'
+import { scanPipelineService } from '../services/scan-pipeline.service'
+import { requireAuth, optionalAuth } from '../middleware/auth'
 
-const scanPipeline = new ScanPipelineService()
+const processCaptureSchema = z.object({
+  captureImages: z.array(z.string()).min(3).max(30),
+  captureLocation: z.object({ lat: z.number(), lng: z.number() }),
+  type: z.enum(['environment', 'object', 'art', 'sculpture']),
+  name: z.string().max(120).optional(),
+  description: z.string().max(500).optional(),
+})
 
-export default async function worldScansRoutes(app: FastifyInstance) {
-  // POST /api/v1/world-scans — Upload images and start 3D reconstruction
-  app.post('/process', async (req, reply) => {
-    // 1. Receive multipart upload (multiple angle photos)
-    // 2. Upload images to R2
-    // 3. Enqueue reconstruction job (Luma AI)
-    // 4. Return scan record with status: 'processing'
-    return reply.code(501).send({ message: 'TODO: implement scan processing' })
+const placeScanSchema = z.object({
+  context: z.object({
+    type: z.enum(['avatar_space', 'virtual_building', 'journal_bg', 'marketplace', 'public_world']),
+    contextId: z.string(),
+    position: z.object({ x: z.number(), y: z.number(), z: z.number() }),
+    rotation: z.object({ rx: z.number(), ry: z.number(), rz: z.number() }),
+    scale: z.object({ sx: z.number(), sy: z.number(), sz: z.number() }),
+  }),
+})
+
+const updateScanSchema = z.object({
+  name: z.string().max(120).optional(),
+  description: z.string().max(500).optional(),
+  visibility: z.enum(['private', 'marketplace', 'public_world']).optional(),
+  price: z.number().min(0).optional(),
+  styleTags: z.array(z.string()).optional(),
+})
+
+const listPublicSchema = z.object({
+  minLat: z.coerce.number(),
+  maxLat: z.coerce.number(),
+  minLng: z.coerce.number(),
+  maxLng: z.coerce.number(),
+})
+
+export default async function worldScansRoutes(fastify: FastifyInstance) {
+  /**
+   * POST /world-scans
+   * Submit a multi-angle capture for 3D reconstruction.
+   * Returns immediately with a scan record (status: processing).
+   * The .glb mesh becomes available when the background job completes.
+   */
+  fastify.post('/', { preHandler: requireAuth }, async (req, reply) => {
+    const user = (req as any).user
+    const body = processCaptureSchema.safeParse(req.body)
+    if (!body.success) return reply.status(400).send({ error: body.error.issues })
+
+    try {
+      const scan = await scanPipelineService.processCapture({
+        userId: user.id,
+        ...body.data,
+      })
+      return reply.status(201).send(scan)
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message })
+    }
   })
 
-  // GET /api/v1/world-scans/:scanId — Get scan status + asset URLs
-  app.get('/:scanId', async (req, reply) => {
-    return reply.code(501).send({ message: 'TODO: get scan by ID' })
+  /**
+   * GET /world-scans/mine
+   * Get the authenticated user's full scan library.
+   */
+  fastify.get('/mine', { preHandler: requireAuth }, async (req, reply) => {
+    const user = (req as any).user
+    try {
+      const scans = await scanPipelineService.getUserScans(user.id)
+      return reply.send(scans)
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message })
+    }
   })
 
-  // GET /api/v1/world-scans — List user's scans
-  app.get('/', async (req, reply) => {
-    return reply.code(501).send({ message: 'TODO: list user scans' })
+  /**
+   * GET /world-scans/public?minLat=&maxLat=&minLng=&maxLng=
+   * List public world assets in a geographic bounding box.
+   * No auth required — powers the NEXUS public map view.
+   */
+  fastify.get('/public', { preHandler: optionalAuth }, async (req, reply) => {
+    const query = listPublicSchema.safeParse(req.query)
+    if (!query.success) return reply.status(400).send({ error: query.error.issues })
+
+    try {
+      const assets = await scanPipelineService.listPublicWorldAssets(query.data)
+      return reply.send(assets)
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message })
+    }
   })
 
-  // POST /api/v1/world-scans/:scanId/place — Place scan in a context
-  app.post('/:scanId/place', async (req, reply) => {
-    return reply.code(501).send({ message: 'TODO: place scan in context' })
+  /**
+   * GET /world-scans/:scanId
+   * Get a single scan. Private scans are only accessible by their owner.
+   */
+  fastify.get('/:scanId', { preHandler: optionalAuth }, async (req, reply) => {
+    const { scanId } = req.params as { scanId: string }
+    const user = (req as any).user
+
+    try {
+      const scan = await scanPipelineService.getScan(scanId, user?.id)
+      return reply.send(scan)
+    } catch (err: any) {
+      const status = err.message === 'Access denied' ? 403 : 404
+      return reply.status(status).send({ error: err.message })
+    }
   })
 
-  // GET /api/v1/world-scans/public — List public world assets by region
-  app.get('/public', async (req, reply) => {
-    return reply.code(501).send({ message: 'TODO: list public world assets' })
+  /**
+   * PATCH /world-scans/:scanId
+   * Update scan metadata, visibility, or marketplace price.
+   */
+  fastify.patch('/:scanId', { preHandler: requireAuth }, async (req, reply) => {
+    const { scanId } = req.params as { scanId: string }
+    const user = (req as any).user
+    const body = updateScanSchema.safeParse(req.body)
+    if (!body.success) return reply.status(400).send({ error: body.error.issues })
+
+    try {
+      const scan = await scanPipelineService.updateScan(scanId, user.id, body.data)
+      return reply.send(scan)
+    } catch (err: any) {
+      return reply.status(403).send({ error: err.message })
+    }
   })
 
-  // POST /api/v1/world-scans/:scanId/submit-approval — Submit for public world
-  app.post('/:scanId/submit-approval', async (req, reply) => {
-    return reply.code(501).send({ message: 'TODO: submit for public approval' })
+  /**
+   * POST /world-scans/:scanId/place
+   * Place a scan asset into an avatar space, virtual building, or public world.
+   */
+  fastify.post('/:scanId/place', { preHandler: requireAuth }, async (req, reply) => {
+    const { scanId } = req.params as { scanId: string }
+    const user = (req as any).user
+    const body = placeScanSchema.safeParse(req.body)
+    if (!body.success) return reply.status(400).send({ error: body.error.issues })
+
+    try {
+      const placement = await scanPipelineService.placeScan(scanId, user.id, body.data.context)
+      return reply.status(201).send(placement)
+    } catch (err: any) {
+      return reply.status(403).send({ error: err.message })
+    }
+  })
+
+  /**
+   * POST /world-scans/:scanId/submit-approval
+   * Submit a processed scan for public world moderation.
+   * Once approved by a moderator, it appears on the global NEXUS map.
+   */
+  fastify.post('/:scanId/submit-approval', { preHandler: requireAuth }, async (req, reply) => {
+    const { scanId } = req.params as { scanId: string }
+    const user = (req as any).user
+
+    try {
+      await scanPipelineService.submitForPublicApproval(scanId, user.id)
+      return reply.send({ message: 'Submitted for review. Approval typically takes 24–48 hours.' })
+    } catch (err: any) {
+      return reply.status(400).send({ error: err.message })
+    }
   })
 }
