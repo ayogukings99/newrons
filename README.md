@@ -1,8 +1,8 @@
-# NEXUS (newrons)
+# NEWRONS (newrons)
 
 > **Built for Africa. Built by Africa. Built in Africa's voice.**
 
-NEXUS is a civilization-layer protocol built from Africa — from its languages, informal economy, street-level commerce, community structures, creative culture, oral traditions, and physical reality.
+NEWRONS is a civilization-layer protocol built from Africa — from its languages, informal economy, street-level commerce, community structures, creative culture, oral traditions, and physical reality.
 
 ---
 
