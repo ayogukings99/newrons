@@ -1,0 +1,50 @@
+[workspace]
+members = [
+    "packages/protocol",
+    "apps/desktop/src-tauri",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Supply Chain OS"]
+license = "UNLICENSED"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.37", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Crypto / Identity
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+bs58 = "0.5"
+sha2 = "0.10"
+rand = "0.8"
+hex = "0.4"
+
+# P2P
+libp2p = { version = "0.53", features = ["tcp", "noise", "yamux", "identify", "kad", "ping", "mdns"] }
+
+# CRDT
+automerge = "0.5"
+
+# SQLite
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# UUID
+uuid = { version = "1.8", features = ["v4"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }

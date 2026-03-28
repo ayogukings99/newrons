@@ -1,0 +1,29 @@
+[package]
+name = "scos-desktop"
+version.workspace = true
+edition.workspace = true
+description = "Supply Chain OS — Tauri desktop node"
+
+[lib]
+name = "scos_desktop_lib"
+crate-type = ["cdylib", "staticlib"]
+
+[[bin]]
+name = "scos-desktop"
+path = "src/main.rs"
+
+[dependencies]
+scos-protocol = { path = "../../../packages/protocol" }
+
+tauri = { version = "2.0", features = ["protocol-asset", "macos-private-api"] }
+tauri-plugin-shell = "2.0"
+tauri-plugin-dialog = "2.0"
+tauri-plugin-store = "2.0"          # secure local storage for the keypair
+tauri-plugin-notification = "2.0"
+
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true

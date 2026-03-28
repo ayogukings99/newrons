@@ -1,0 +1,6 @@
+{
+  "name": "@scos/ml",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ONNX demand forecasting model distribution + Python training scripts"
+}

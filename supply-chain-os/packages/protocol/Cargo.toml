@@ -1,0 +1,30 @@
+[package]
+name = "scos-protocol"
+version.workspace = true
+edition.workspace = true
+description = "Sovereign Node protocol core — DAG, CRDT, P2P, Identity, SQLite projection"
+
+[lib]
+name = "scos_protocol"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ed25519-dalek.workspace = true
+bs58.workspace = true
+sha2.workspace = true
+rand.workspace = true
+hex.workspace = true
+libp2p.workspace = true
+automerge.workspace = true
+rusqlite.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
+tokio = { version = "1.37", features = ["full", "test-util"] }

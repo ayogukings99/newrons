@@ -1,0 +1,23 @@
+node_modules/
+dist/
+build/
+.turbo/
+target/
+*.log
+.env
+.env.local
+.DS_Store
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Tauri
+apps/desktop/src-tauri/target/
+
+# Expo
+apps/mobile/.expo/
+apps/mobile/android/
+apps/mobile/ios/
+
+# ONNX models (too large for git — use LFS or distribute separately)
+packages/ml/models/*.onnx
