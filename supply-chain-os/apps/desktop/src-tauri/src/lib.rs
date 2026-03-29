@@ -1,13 +1,19 @@
 use tauri::Manager;
 use tracing::info;
+use protocol::{NodeDb, SourceChain, Identity};
+use std::sync::Mutex;
 
-mod commands;
-mod daemon;
+pub mod commands;
+pub mod daemon;
 
 /// Global application state — one per Tauri process.
 pub struct AppState {
     /// The node's local database (SQLite via rusqlite)
-    pub db_path: String,
+    pub db: Mutex<NodeDb>,
+    /// The node's source chain (append-only event log)
+    pub chain: Mutex<SourceChain>,
+    /// The node's identity (DID keypair)
+    pub identity: Mutex<Identity>,
     /// The node's DID (loaded from secure store at startup)
     pub node_did: tokio::sync::Mutex<Option<String>>,
 }
@@ -36,8 +42,17 @@ pub fn run() {
 
             info!("Node DB path: {}", db_path);
 
+            // Initialize database, identity, and chain
+            let db = NodeDb::open(&db_path).expect("failed to open database");
+            let identity = Identity::generate().expect("failed to generate identity");
+            let chain = SourceChain::genesis(&identity).expect("failed to create genesis chain");
+
+            info!("Node identity: {}", identity.did);
+
             app.manage(AppState {
-                db_path,
+                db: Mutex::new(db),
+                chain: Mutex::new(chain),
+                identity: Mutex::new(identity),
                 node_did: tokio::sync::Mutex::new(None),
             });
 
@@ -57,15 +72,39 @@ pub fn run() {
             commands::inventory::list_skus,
             commands::inventory::create_sku,
             commands::inventory::get_stock_levels,
+            commands::inventory::get_stock_history,
             commands::inventory::adjust_stock,
+            commands::inventory::receive_stock,
+            commands::inventory::transfer_stock,
+            commands::inventory::check_reorder_alerts,
+            commands::inventory::batch_stock_count,
             // Procurement
             commands::procurement::create_purchase_order,
+            commands::procurement::confirm_purchase_order,
+            commands::procurement::cancel_purchase_order,
+            commands::procurement::record_shipment,
+            commands::procurement::receive_shipment,
             commands::procurement::list_purchase_orders,
             commands::procurement::get_purchase_order,
+            commands::procurement::get_supplier_scorecard,
             // Warehouse
-            commands::warehouse::list_tasks,
+            commands::warehouse::create_task,
+            commands::warehouse::assign_task,
             commands::warehouse::complete_task,
+            commands::warehouse::list_tasks,
             commands::warehouse::get_bin_contents,
+            commands::warehouse::get_bin_map,
+            commands::warehouse::start_cycle_count,
+            commands::warehouse::complete_cycle_count,
+            commands::warehouse::auto_put_tasks,
+            // Routes
+            commands::routes::create_route,
+            commands::routes::optimize_route,
+            commands::routes::assign_driver,
+            commands::routes::list_routes,
+            commands::routes::get_route_detail,
+            commands::routes::complete_stop,
+            commands::routes::confirm_delivery,
             // Peers
             commands::peers::list_peers,
             commands::peers::connect_peer,

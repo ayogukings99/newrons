@@ -2,5 +2,8 @@ pub mod identity;
 pub mod inventory;
 pub mod procurement;
 pub mod warehouse;
+pub mod routes;
+pub mod quality;
+pub mod forecasting;
 pub mod peers;
 pub mod chain;

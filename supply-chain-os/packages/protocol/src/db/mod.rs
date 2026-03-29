@@ -45,6 +45,11 @@ impl NodeDb {
         Ok(db)
     }
 
+    /// Get reference to the underlying SQLite connection for direct queries.
+    pub fn get_connection(&self) -> &Connection {
+        &self.conn
+    }
+
     // ─── Schema Init ─────────────────────────────────────────────────────────
 
     fn init_schema(&self) -> Result<(), DbError> {
@@ -108,6 +113,57 @@ impl NodeDb {
             events.push(row?);
         }
         Ok(events)
+    }
+
+    // ─── Generic Query Helpers ───────────────────────────────────────────────
+
+    /// Execute a query that returns a single row, mapping with a closure.
+    pub fn query_row<F, T>(&self, sql: &str, params: rusqlite::params::Params, f: F) -> Result<T, DbError>
+    where
+        F: FnOnce(&rusqlite::Row) -> RusqliteResult<T>,
+    {
+        let mut stmt = self.conn.prepare(sql)?;
+        let result = stmt.query_row(params, f)?;
+        Ok(result)
+    }
+
+    /// Execute a query that returns multiple rows, mapping with a closure.
+    pub fn query_rows<F, T>(&self, sql: &str, f: F) -> Result<Vec<T>, DbError>
+    where
+        F: Fn(&rusqlite::Row) -> RusqliteResult<T>,
+    {
+        let mut stmt = self.conn.prepare(sql)?;
+        let rows = stmt.query_map([], f)?;
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row?);
+        }
+        Ok(results)
+    }
+
+    /// Execute a query that may return one row.
+    pub fn query_row_opt<F, T>(&self, sql: &str, params: rusqlite::params::Params, f: F) -> Result<Option<T>, DbError>
+    where
+        F: FnOnce(&rusqlite::Row) -> RusqliteResult<T>,
+    {
+        let mut stmt = self.conn.prepare(sql)?;
+        match stmt.query_row(params, f) {
+            Ok(result) => Ok(Some(result)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(DbError::Sqlite(e)),
+        }
+    }
+
+    /// Execute an INSERT statement.
+    pub fn execute_insert(&self, sql: &str, params: rusqlite::params::Params) -> Result<(), DbError> {
+        self.conn.execute(sql, params)?;
+        Ok(())
+    }
+
+    /// Execute an UPDATE statement.
+    pub fn execute_update(&self, sql: &str, params: rusqlite::params::Params) -> Result<(), DbError> {
+        self.conn.execute(sql, params)?;
+        Ok(())
     }
 
     // ─── Projection Engine ───────────────────────────────────────────────────
@@ -355,7 +411,10 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
   confirmed_at      INTEGER,
   shipped_at        INTEGER,
   received_at       INTEGER,
-  created_at        INTEGER NOT NULL
+  created_at        INTEGER NOT NULL,
+  our_sig           TEXT,
+  their_sig         TEXT,
+  dht_anchor        TEXT
 );
 
 CREATE TABLE IF NOT EXISTS po_line_items (
@@ -505,8 +564,8 @@ mod tests {
         db.apply_event(&genesis).unwrap();
 
         // Verify node was projected
-        let count: i64 = db.conn
-            .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
+        let count: i64 = db
+            .query_row("SELECT COUNT(*) FROM nodes", rusqlite::params![], |r| r.get(0))
             .unwrap();
         assert_eq!(count, 1);
     }

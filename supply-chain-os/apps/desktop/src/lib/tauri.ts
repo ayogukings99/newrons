@@ -28,27 +28,84 @@ export const getNodeProfile = (): Promise<NodeProfile> =>
 
 // ─── Inventory ───────────────────────────────────────────────────────────────
 
-export const listSkus = (): Promise<Sku[]> =>
+export const listSkus = (): Promise<{ skus: Sku[] }> =>
   invoke('list_skus')
 
-export const createSku = (input: Omit<Sku, 'created_at'>): Promise<{ status: string }> =>
+export const createSku = (input: Omit<Sku, 'created_at'>): Promise<{ status: string; event_id: string; timestamp: number }> =>
   invoke('create_sku', { input })
 
-export const getStockLevels = (): Promise<StockLevel[]> =>
-  invoke('get_stock_levels')
+export const getStockLevels = (skuId: string): Promise<{ levels: StockLevel[] }> =>
+  invoke('get_stock_levels', { sku_id: skuId })
+
+export const getStockHistory = (skuId: string, limit?: number): Promise<{ history: StockEvent[] }> =>
+  invoke('get_stock_history', { sku_id: skuId, limit })
 
 export const adjustStock = (args: {
   skuId: string
   locationId: string
   delta: number
   reason: string
-}): Promise<{ status: string }> =>
+}): Promise<{ status: string; event_id: string; timestamp: number }> =>
   invoke('adjust_stock', {
-    sku_id: args.skuId,
-    location_id: args.locationId,
-    delta: args.delta,
-    reason: args.reason,
+    input: {
+      sku_id: args.skuId,
+      location_id: args.locationId,
+      delta: args.delta,
+      reason: args.reason,
+    }
   })
+
+export const receiveStock = (args: {
+  skuId: string
+  locationId: string
+  qty: number
+}): Promise<{ status: string; event_id: string; timestamp: number }> =>
+  invoke('receive_stock', {
+    input: {
+      sku_id: args.skuId,
+      location_id: args.locationId,
+      qty: args.qty,
+    }
+  })
+
+export const transferStock = (args: {
+  skuId: string
+  fromLocation: string
+  toLocation: string
+  qty: number
+}): Promise<{ status: string; event_id: string; timestamp: number }> =>
+  invoke('transfer_stock', {
+    input: {
+      sku_id: args.skuId,
+      from_location: args.fromLocation,
+      to_location: args.toLocation,
+      qty: args.qty,
+    }
+  })
+
+export interface ReorderAlert {
+  sku_id: string
+  sku_name: string
+  location_id: string
+  qty_on_hand: number
+  reorder_point: number
+  qty_to_order: number
+}
+
+export const checkReorderAlerts = (): Promise<{ alerts: ReorderAlert[] }> =>
+  invoke('check_reorder_alerts')
+
+export interface CountResult {
+  sku_id: string
+  location_id: string
+  expected_qty: number
+  counted_qty: number
+  delta: number
+  variance_pct: number
+}
+
+export const batchStockCount = (counts: Array<{ sku_id: string; location_id: string; counted_qty: number }>): Promise<{ status: string; results: CountResult[] }> =>
+  invoke('batch_stock_count', { input: { counts } })
 
 // ─── Procurement ─────────────────────────────────────────────────────────────
 
