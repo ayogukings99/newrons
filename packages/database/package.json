@@ -1,0 +1,14 @@
+{
+  "name": "database",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./index.ts",
+  "scripts": {
+    "migrate": "echo 'run migrations here'",
+    "generate": "echo 'run generators here'",
+    "build": "echo 'no build step'",
+    "typecheck": "echo 'no typecheck'",
+    "lint": "echo 'no lint'",
+    "test": "echo 'no tests'"
+  }
+}
