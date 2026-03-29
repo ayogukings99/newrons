@@ -105,6 +105,23 @@ pub fn run() {
             commands::routes::get_route_detail,
             commands::routes::complete_stop,
             commands::routes::confirm_delivery,
+            // Quality
+            commands::quality::cmd_start_inspection,
+            commands::quality::cmd_inspect_item,
+            commands::quality::cmd_complete_batch,
+            commands::quality::cmd_raise_ncr,
+            commands::quality::cmd_list_inspections,
+            commands::quality::cmd_get_batch_detail,
+            commands::quality::cmd_get_supplier_quality,
+            // Forecasting
+            commands::forecasting::cmd_run_forecast,
+            commands::forecasting::cmd_get_forecast,
+            commands::forecasting::cmd_get_all_forecasts,
+            commands::forecasting::cmd_apply_override,
+            commands::forecasting::cmd_get_demand_history,
+            commands::forecasting::cmd_check_accuracy,
+            commands::forecasting::cmd_detect_anomalies,
+            commands::forecasting::cmd_suggest_reorder,
             // Peers
             commands::peers::list_peers,
             commands::peers::connect_peer,
