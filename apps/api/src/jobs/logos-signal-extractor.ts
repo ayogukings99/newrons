@@ -171,7 +171,7 @@ async function storeJobHistory(result: ExtractionResult): Promise<void> {
  * Example with node-cron:
  *
  *   import cron from 'node-cron'
- *   cron.schedule('0 */6 * * *', () => {
+ *   cron.schedule('0 *\/6 * * *', () => {
  *     runLogosSignalExtraction().catch(err => {
  *       console.error('LOGOS extraction job failed:', err)
  *     })

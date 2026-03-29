@@ -3,7 +3,9 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -14,5 +16,10 @@
     "incremental": true,
     "composite": true
   },
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "**/*.example.tsx",
+    "**/*.example.ts",
+    "**/*.example.jsx"
+  ]
 }

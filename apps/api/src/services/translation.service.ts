@@ -252,7 +252,7 @@ export class TranslationService {
 
       if (!resp.ok) return this.heuristicDetect(text)
 
-      const data = await resp.json()
+      const data = await resp.json() as any[]
       const r    = data[0]
 
       return [
@@ -397,7 +397,7 @@ export class TranslationService {
     })
 
     if (!resp.ok) throw new Error(`Speech-to-text error: ${resp.status}`)
-    const data = await resp.json()
+    const data = await resp.json() as any
     return data.DisplayText ?? ''
   }
 
