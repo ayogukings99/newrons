@@ -22,8 +22,7 @@
     "cohere-ai": "^7.10.0",
     "zod": "^3.22.0",
     "pino": "^9.1.0",
-    "dotenv": "^16.4.0",
-    "shared": "workspace:*"
+    "dotenv": "^16.4.0"
   },
   "devDependencies": {
     "tsx": "^4.11.0",
