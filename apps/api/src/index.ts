@@ -69,4 +69,17 @@ const start = async () => {
   }
 }
 
-start()
+// Vercel serverless handler — export the app for serverless environments
+// In production (Vercel), the function is invoked per-request, not via listen()
+if (process.env.VERCEL) {
+  // Ready the app without listening on a port
+  app.ready().catch(err => {
+    console.error('Fastify ready error:', err)
+  })
+  module.exports = async (req: any, res: any) => {
+    await app.ready()
+    app.server.emit('request', req, res)
+  }
+} else {
+  start()
+}
