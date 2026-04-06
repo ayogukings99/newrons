@@ -6,8 +6,9 @@
 
 ## What This Is
 
-**neurons.app** is a decentralised cooperative economic protocol.
+**neurons.app** (Sovereign OS) is a living, decentralised, AI-native operating system.
 One unified mobile app. One brand. Two inseparable layers — social and economic — built as a single organism.
+Five named layers — Root Ledger, Brain, Interface, Loom, Spirits — forming one organism.
 
 **GitHub**: `github.com/ayogukings99/newrons`
 **Owner**: Kelechi (ayogukings99@gmail.com)
@@ -59,6 +60,16 @@ Same DID across social layer AND economic layer. One identity, one keypair, two 
 - **SQLite** (local, per-node) — sovereign local state, event log, projections
 - **Source Chain** (append-only DAG) — every action is an event; SQLite is always a rebuildable projection
 
+### Named Architecture Layers
+
+| Layer | Name | Function |
+|---|---|---|
+| Foundation | **Root Ledger** | Smart contracts, routing, DAG event log |
+| Intelligence | **Brain** | AI + optimisation (Blackbox + LOGOS) |
+| Interface | **Interface** | React / React Native / Tauri UI |
+| Tasks | **Loom** | Task execution + escrow rewards |
+| Identity | **Spirits** | Anima avatars + digital assets |
+
 ### The 15 Pillars (v5) — Reusable Context Forms
 The pillars are abstract interaction patterns that apply in BOTH social and economic contexts:
 1. Living Avatar — sovereign node identity (DID-anchored 3D avatar)
@@ -76,6 +87,22 @@ The pillars are abstract interaction patterns that apply in BOTH social and econ
 13. Barbershop Layer — scheduled community sessions
 14. Security Intelligence — community threat awareness
 15. Personal AI Quiz — adaptive learning layer
+
+### Sovereign OS Systems (NEW)
+
+| System | Type | Function |
+|---|---|---|
+| Anima | Extends Pillar 1 | High-fidelity 3D avatar with wealth/velocity/stillness evolution |
+| Loom | NEW | Escrow-backed gamified task system with proof-of-work rewards |
+| Beehive Network | NEW | GPS hex-node clustering for local-first economy + service routing |
+| Swarm Protocol | Extends libp2p | Self-organising node clusters, adaptive load balancing |
+| Blackbox Optimizer | NEW | Invisible performance/latency/AI tuning layer |
+| Storefront | NEW | Each node = persistent shop/service page |
+| Wardrobe | NEW | Scan real clothing, digital wardrobe, avatar try-on |
+| Calendar | NEW | Unified calendar: tasks, chats, social, health |
+| Hiring | NEW | Proof-of-work hiring — companies view task history, no CV |
+
+> See `docs/SOVEREIGN_OS.md` for full specification.
 
 ### Economic Layer — 6 Modules
 Built inside `supply-chain-os/packages/protocol/` (pure Rust, local-first):
@@ -190,6 +217,9 @@ TypeScript IPC wrappers at `supply-chain-os/apps/desktop/src/lib/tauri.ts`.
 4. **Real libp2p P2P sessions** — peer discovery, trading partner connections, dual-signed event exchange
 5. **Living Avatar** (Pillar 1) — DID-anchored 3D avatar, the visual face of the sovereign node
 6. **Brand Finance Card** (Pillar 4) — economic passport screen: NXT balance, reputation, trading history
+7. **Loom Task System** — escrow-backed task engine (new Sovereign OS system)
+8. **Beehive Network** — GPS hex-clustering for local economy routing
+9. **Storefront System** — node-as-shop persistent profiles
 
 ---
 
@@ -200,3 +230,4 @@ TypeScript IPC wrappers at `supply-chain-os/apps/desktop/src/lib/tauri.ts`.
 - Use raw SQL balance updates — always use `process_wallet_transfer` RPC for NXT
 - Create new DID formats — `did:scn:<base58>` is the standard
 - Touch `process_wallet_transfer` without understanding the escrow/reserve pattern in `settlement-bridge.service.ts`
+- Treat Sovereign OS systems (Loom, Beehive, Storefront, etc.) as separate products — they are subsystems of ONE organism, sharing identity (DID) and settlement (NXT)
