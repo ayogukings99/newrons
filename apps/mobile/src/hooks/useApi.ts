@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { supabase } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
