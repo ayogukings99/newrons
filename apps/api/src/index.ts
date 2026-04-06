@@ -72,17 +72,10 @@ const start = async () => {
   }
 }
 
-// Vercel serverless handler — singleton pattern for cold starts
-// The app is built once per container and reused across invocations.
+// Vercel serverless export
 if (process.env.VERCEL) {
-  let isReady = false
-  const readyPromise = app.ready().then(() => { isReady = true }).catch(err => {
-    console.error('Fastify boot error:', err)
-    throw err
-  })
-
   module.exports = async (req: any, res: any) => {
-    if (!isReady) await readyPromise
+    await app.ready()
     app.server.emit('request', req, res)
   }
 } else {
