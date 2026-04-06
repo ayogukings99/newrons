@@ -22,7 +22,14 @@
     "cohere-ai": "^7.10.0",
     "zod": "^3.22.0",
     "pino": "^9.1.0",
-    "dotenv": "^16.4.0"
+    "dotenv": "^16.4.0",
+    "microsoft-cognitiveservices-speech-sdk": "^1.36.0",
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/s3-request-presigner": "^3.600.0",
+    "@solana/web3.js": "^1.95.0",
+    "@solana/spl-token": "^0.4.0",
+    "nanoid": "^3.3.7",
+    "node-cron": "^3.0.3"
   },
   "devDependencies": {
     "tsx": "^4.11.0",
