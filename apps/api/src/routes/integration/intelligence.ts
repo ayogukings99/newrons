@@ -13,7 +13,7 @@
 import { FastifyInstance } from 'fastify'
 import { logosIntelligenceService } from '../../services/integration/logos-intelligence.service'
 
-export async function intelligenceRoutes(app: FastifyInstance) {
+export default async function intelligenceRoutes(app: FastifyInstance) {
 
   /**
    * GET /demand-signals
