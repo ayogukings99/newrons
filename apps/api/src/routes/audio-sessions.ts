@@ -293,25 +293,24 @@ export default async function audioSessionsRoutes(fastify: FastifyInstance) {
    *   { type: 'track_queued', trackId, position, requestedBy }
    *   { type: 'session_ended' }
    */
-  fastify.get('/:sessionId/ws', { websocket: true }, (socket, req) => {
-    const { sessionId } = req.params as { sessionId: string }
-
-    // Register this WebSocket with the room so it receives broadcasts
-    groupAudioService.registerWebSocket(sessionId, socket as unknown as WebSocket)
-
-    socket.on('message', (rawMessage) => {
-      try {
-        const msg = JSON.parse(rawMessage.toString())
-        if (msg.type === 'ping') {
-          socket.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }))
+  // WebSocket endpoint — only registered when websocket plugin is available (not on Vercel)
+  if (!process.env.VERCEL) {
+    fastify.get('/:sessionId/ws', { websocket: true }, (socket, req) => {
+      const { sessionId } = req.params as { sessionId: string }
+      groupAudioService.registerWebSocket(sessionId, socket as unknown as WebSocket)
+      socket.on('message', (rawMessage) => {
+        try {
+          const msg = JSON.parse(rawMessage.toString())
+          if (msg.type === 'ping') {
+            socket.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }))
+          }
+        } catch {
+          // Ignore malformed messages
         }
-      } catch {
-        // Ignore malformed messages
-      }
+      })
+      socket.on('close', () => {
+        // Cleanup is handled by the event listener registered in registerWebSocket
+      })
     })
-
-    socket.on('close', () => {
-      // Cleanup is handled by the event listener registered in registerWebSocket
-    })
-  })
+  }
 }

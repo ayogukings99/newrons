@@ -25,7 +25,10 @@ const app = Fastify({ logger: { level: config.LOG_LEVEL } })
 app.register(cors, { origin: config.CORS_ORIGINS.split(',') })
 app.register(jwt, { secret: config.SUPABASE_JWT_SECRET })
 app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024 } }) // 100MB
-app.register(websocket)
+// WebSocket not supported on Vercel serverless — only register in non-serverless envs
+if (!process.env.VERCEL) {
+  app.register(websocket)
+}
 
 // Routes — v1
 const API_PREFIX = '/api/v1'
@@ -69,15 +72,17 @@ const start = async () => {
   }
 }
 
-// Vercel serverless handler — export the app for serverless environments
-// In production (Vercel), the function is invoked per-request, not via listen()
+// Vercel serverless handler — singleton pattern for cold starts
+// The app is built once per container and reused across invocations.
 if (process.env.VERCEL) {
-  // Ready the app without listening on a port
-  app.ready().catch(err => {
-    console.error('Fastify ready error:', err)
+  let isReady = false
+  const readyPromise = app.ready().then(() => { isReady = true }).catch(err => {
+    console.error('Fastify boot error:', err)
+    throw err
   })
+
   module.exports = async (req: any, res: any) => {
-    await app.ready()
+    if (!isReady) await readyPromise
     app.server.emit('request', req, res)
   }
 } else {
