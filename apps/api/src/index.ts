@@ -76,7 +76,14 @@ const start = async () => {
 // Vercel serverless export
 if (process.env.VERCEL) {
   module.exports = async (req: any, res: any) => {
-    await app.ready()
+    try {
+      await app.ready()
+    } catch (err: any) {
+      console.error('[NEXUS] app.ready() failed:', err?.message, err?.stack)
+      res.statusCode = 500
+      res.end(JSON.stringify({ error: 'Initialization failed', detail: err?.message }))
+      return
+    }
     app.server.emit('request', req, res)
   }
 } else {
