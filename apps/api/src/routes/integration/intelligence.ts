@@ -11,6 +11,7 @@
  */
 
 import { FastifyInstance } from 'fastify'
+import { requireAuth } from '../../middleware/auth'
 import { logosIntelligenceService } from '../../services/integration/logos-intelligence.service'
 
 export default async function intelligenceRoutes(app: FastifyInstance) {
@@ -123,8 +124,8 @@ export default async function intelligenceRoutes(app: FastifyInstance) {
    *   extractedCount: number of new signals extracted
    *   signals: DemandSignal[] — extracted signals
    */
-  app.post('/extract', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/extract', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub
 
     // TODO: Check if user is admin
     // For now, allow any authenticated user (should be restricted in production)
@@ -163,8 +164,8 @@ export default async function intelligenceRoutes(app: FastifyInstance) {
    *   entityId: string — supply chain entity ID
    *   relevance: 0-1 (optional, default 0.5)
    */
-  app.post('/link', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/link', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub
 
     const { logosNodeId, entityType, entityId, relevance } = req.body as {
       logosNodeId?: string
