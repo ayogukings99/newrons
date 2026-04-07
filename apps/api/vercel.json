@@ -1,1 +1,14 @@
-{"version":2,"builds":[{"src":"src/index.ts","use":"@vercel/node","config":{"includeFiles":["src/**"]}}],"routes":[{"src":"/(.*)","dest":"src/index.ts"}]}
+{
+  "version": 2,
+  "buildCommand": "echo 'build handled by @vercel/node'",
+  "builds": [
+    {
+      "src": "src/index.ts",
+      "use": "@vercel/node",
+      "config": { "includeFiles": ["src/**"] }
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "src/index.ts" }
+  ]
+}

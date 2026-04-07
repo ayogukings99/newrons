@@ -92,18 +92,18 @@ ALTER TABLE warehouse_nfc_events ENABLE ROW LEVEL SECURITY;
 
 -- Users see their own node identity
 CREATE POLICY "users_see_own_node_identity"
-  ON node_identities FOR SELECT USING (user_id = auth.uid()::bigint);
+  ON node_identities FOR SELECT USING (user_id = (SELECT id FROM users WHERE auth_id = auth.uid()));
 
 -- Users can insert their own node identity (once per user)
 CREATE POLICY "users_insert_own_node_identity"
-  ON node_identities FOR INSERT WITH CHECK (user_id = auth.uid()::bigint);
+  ON node_identities FOR INSERT WITH CHECK (user_id = (SELECT id FROM users WHERE auth_id = auth.uid()));
 
 -- Users see settlements where they are buyer or supplier (via DID)
 CREATE POLICY "users_see_own_settlements"
   ON po_settlements FOR SELECT
   USING (
-    buyer_did IN (SELECT did FROM node_identities WHERE user_id = auth.uid()::bigint)
-    OR supplier_did IN (SELECT did FROM node_identities WHERE user_id = auth.uid()::bigint)
+    buyer_did IN (SELECT did FROM node_identities WHERE user_id = (SELECT id FROM users WHERE auth_id = auth.uid()))
+    OR supplier_did IN (SELECT did FROM node_identities WHERE user_id = (SELECT id FROM users WHERE auth_id = auth.uid()))
   );
 
 -- Demand signals readable by all authenticated users
@@ -112,7 +112,7 @@ CREATE POLICY "demand_signals_readable_by_authenticated"
 
 -- Users see their own warehouse NFC events
 CREATE POLICY "users_see_own_nfc_events"
-  ON warehouse_nfc_events FOR SELECT USING (user_id = auth.uid()::bigint);
+  ON warehouse_nfc_events FOR SELECT USING (user_id = (SELECT id FROM users WHERE auth_id = auth.uid()));
 
 -- ── INDEXES ──────────────────────────────────────────────────────────────────
 
