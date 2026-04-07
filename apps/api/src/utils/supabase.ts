@@ -10,6 +10,9 @@ export const supabase = createClient(
   }
 )
 
+// Alias used by services that import supabaseAdmin
+export const supabaseAdmin = supabase
+
 // Create a per-request client with user's JWT for RLS
 export const createUserClient = (jwt: string) =>
   createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, {

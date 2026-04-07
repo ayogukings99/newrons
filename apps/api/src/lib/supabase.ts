@@ -1,2 +1,2 @@
-// Re-export supabase client from utils
-export { supabase, supabaseAdmin } from '../utils/supabase'
+// Re-export supabase clients from utils
+export { supabase, supabaseAdmin, createUserClient } from '../utils/supabase'
