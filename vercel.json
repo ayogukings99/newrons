@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "buildCommand": "echo 'no build needed — @vercel/node handles compilation'",
+  "builds": [
+    {
+      "src": "apps/api/src/index.ts",
+      "use": "@vercel/node",
+      "config": { "includeFiles": ["apps/api/src/**"] }
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "apps/api/src/index.ts" }
+  ]
+}
