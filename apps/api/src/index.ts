@@ -3,6 +3,7 @@ import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import multipart from '@fastify/multipart'
 import websocket from '@fastify/websocket'
+import fp from 'fastify-plugin'
 import { config } from './utils/config'
 
 // Jobs
@@ -23,7 +24,7 @@ const app = Fastify({ logger: { level: config.LOG_LEVEL } })
 
 // Plugins
 app.register(cors, { origin: config.CORS_ORIGINS.split(',') })
-app.register(jwt, { secret: config.SUPABASE_JWT_SECRET })
+app.register(fp(jwt), { secret: config.SUPABASE_JWT_SECRET })
 app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024 } }) // 100MB
 // WebSocket not supported on Vercel serverless — only register in non-serverless envs
 if (!process.env.VERCEL) {
