@@ -23,13 +23,14 @@
 
 import { FastifyInstance }  from 'fastify'
 import { developerService, ApiKeyScope, ApiKeyEnv } from '../services/developer.service'
+import { requireAuth } from '../middleware/auth'
 
 export async function developerRoutes(app: FastifyInstance) {
 
   // ── Account ────────────────────────────────────────────────────────────────
 
-  app.post('/account', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/account', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { appName, appUrl } = req.body as { appName: string; appUrl?: string }
 
     if (!appName?.trim()) return reply.code(400).send({ error: 'appName required' })
@@ -42,8 +43,8 @@ export async function developerRoutes(app: FastifyInstance) {
     }
   })
 
-  app.get('/account', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/account', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     try {
       const account = await developerService.getAccount(userId)
       if (!account) return reply.code(404).send({ error: 'No developer account found' })
@@ -53,8 +54,8 @@ export async function developerRoutes(app: FastifyInstance) {
     }
   })
 
-  app.patch('/account', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.patch('/account', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const updates = req.body as { appName?: string; appUrl?: string; webhookUrl?: string }
     try {
       await developerService.updateAccount(userId, updates)
@@ -71,8 +72,8 @@ export async function developerRoutes(app: FastifyInstance) {
    * Body: { name, scopes, env?, expiresAt? }
    * Returns the raw key once — must be saved by the client.
    */
-  app.post('/keys', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/keys', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { name, scopes, env = 'live', expiresAt } = req.body as {
       name:       string
       scopes:     ApiKeyScope[]
@@ -99,8 +100,8 @@ export async function developerRoutes(app: FastifyInstance) {
     }
   })
 
-  app.get('/keys', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/keys', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const account = await developerService.getAccount(userId)
     if (!account) return reply.code(404).send({ error: 'No developer account found' })
 
@@ -112,8 +113,8 @@ export async function developerRoutes(app: FastifyInstance) {
     }
   })
 
-  app.delete('/keys/:keyId', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.delete('/keys/:keyId', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { keyId } = req.params as { keyId: string }
 
     const account = await developerService.getAccount(userId)
@@ -127,8 +128,8 @@ export async function developerRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post('/keys/:keyId/rotate', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/keys/:keyId/rotate', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { keyId } = req.params as { keyId: string }
 
     const account = await developerService.getAccount(userId)
@@ -144,8 +145,8 @@ export async function developerRoutes(app: FastifyInstance) {
 
   // ── Usage ──────────────────────────────────────────────────────────────────
 
-  app.get('/usage/:keyId', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/usage/:keyId', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { keyId } = req.params as { keyId: string }
     const { days = '30' } = req.query as { days?: string }
 
@@ -162,7 +163,7 @@ export async function developerRoutes(app: FastifyInstance) {
 
   // ── Admin ──────────────────────────────────────────────────────────────────
 
-  app.post('/admin/reset-monthly', { preHandler: [app.authenticate, app.requireAdmin] }, async (_req, reply) => {
+  app.post('/admin/reset-monthly', { preHandler: [requireAuth, app.requireAdmin] }, async (_req, reply) => {
     try {
       await developerService.resetMonthlyUsage()
       return reply.send({ ok: true })

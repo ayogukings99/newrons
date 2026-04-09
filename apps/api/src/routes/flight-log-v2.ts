@@ -23,6 +23,7 @@
 
 import { FastifyInstance } from 'fastify'
 import { flightLogV2Service, PilotRole } from '../services/flight-log-v2.service'
+import { requireAuth } from '../middleware/auth'
 
 export async function flightLogV2Routes(app: FastifyInstance) {
 
@@ -32,8 +33,8 @@ export async function flightLogV2Routes(app: FastifyInstance) {
    * POST /log
    * Add a new logbook entry.
    */
-  app.post('/log', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/log', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const body = req.body as {
       date:               string
       aircraftReg:        string
@@ -94,8 +95,8 @@ export async function flightLogV2Routes(app: FastifyInstance) {
   /**
    * GET /log?from=YYYY-MM-DD&to=YYYY-MM-DD&limit=50&offset=0
    */
-  app.get('/log', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/log', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { from, to, limit = '50', offset = '0' } = req.query as Record<string, string>
 
     try {
@@ -115,8 +116,8 @@ export async function flightLogV2Routes(app: FastifyInstance) {
   /**
    * GET /log/totals
    */
-  app.get('/log/totals', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/log/totals', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     try {
       const totals = await flightLogV2Service.getLogbookTotals(userId)
       return reply.send(totals)
@@ -129,8 +130,8 @@ export async function flightLogV2Routes(app: FastifyInstance) {
    * GET /log/currency
    * Returns passenger and IFR currency status per FAR 61.57.
    */
-  app.get('/log/currency', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/log/currency', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     try {
       const currency = await flightLogV2Service.getCurrencyStatus(userId)
       return reply.send(currency)
@@ -142,8 +143,8 @@ export async function flightLogV2Routes(app: FastifyInstance) {
   /**
    * GET /log/export?format=csv|json
    */
-  app.get('/log/export', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/log/export', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { format = 'json' } = req.query as { format?: 'csv' | 'json' }
 
     try {
@@ -165,8 +166,8 @@ export async function flightLogV2Routes(app: FastifyInstance) {
    * POST /routes
    * Save and optimize a flight route.
    */
-  app.post('/routes', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/routes', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const {
       name, origin, destination, waypoints = [],
       cruiseKtas, fuelBurnGph, usableFuelGal,
@@ -204,8 +205,8 @@ export async function flightLogV2Routes(app: FastifyInstance) {
   /**
    * GET /routes?limit=20&offset=0
    */
-  app.get('/routes', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/routes', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { limit = '20', offset = '0' } = req.query as Record<string, string>
 
     try {

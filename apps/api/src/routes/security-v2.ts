@@ -23,6 +23,7 @@
 
 import { FastifyInstance } from 'fastify'
 import { securityV2Service, IncidentType, IncidentSeverity } from '../services/security-v2.service'
+import { requireAuth } from '../middleware/auth'
 
 export async function securityV2Routes(app: FastifyInstance) {
 
@@ -32,8 +33,8 @@ export async function securityV2Routes(app: FastifyInstance) {
    * POST /reports
    * Submit a new community safety report.
    */
-  app.post('/reports', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/reports', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { type, severity, latitude, longitude, description, anonymous = true } = req.body as {
       type:        IncidentType
       severity:    IncidentSeverity
@@ -85,7 +86,7 @@ export async function securityV2Routes(app: FastifyInstance) {
    * PATCH /incidents/:incidentId/status  (admin)
    * Body: { status: 'resolved' | 'dismissed', summary? }
    */
-  app.patch('/incidents/:incidentId/status', { preHandler: [app.authenticate, app.requireAdmin] }, async (req, reply) => {
+  app.patch('/incidents/:incidentId/status', { preHandler: [requireAuth, app.requireAdmin] }, async (req, reply) => {
     const { incidentId } = req.params as { incidentId: string }
     const { status, summary } = req.body as { status: 'resolved' | 'dismissed'; summary?: string }
 
@@ -107,8 +108,8 @@ export async function securityV2Routes(app: FastifyInstance) {
    * GET /contacts
    * List my trusted contacts with mutual trust status.
    */
-  app.get('/contacts', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/contacts', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     try {
       const contacts = await securityV2Service.listTrustedContacts(userId)
       return reply.send({ contacts })
@@ -121,8 +122,8 @@ export async function securityV2Routes(app: FastifyInstance) {
    * POST /contacts/:contactId
    * Add a user as a trusted contact.
    */
-  app.post('/contacts/:contactId', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId    = (req as any).userId as string
+  app.post('/contacts/:contactId', { preHandler: requireAuth }, async (req, reply) => {
+    const userId    = (req.user as { sub: string }).sub as string
     const { contactId } = req.params as { contactId: string }
 
     try {
@@ -137,8 +138,8 @@ export async function securityV2Routes(app: FastifyInstance) {
    * DELETE /contacts/:contactId
    * Remove a trusted contact.
    */
-  app.delete('/contacts/:contactId', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId    = (req as any).userId as string
+  app.delete('/contacts/:contactId', { preHandler: requireAuth }, async (req, reply) => {
+    const userId    = (req.user as { sub: string }).sub as string
     const { contactId } = req.params as { contactId: string }
 
     try {
@@ -156,8 +157,8 @@ export async function securityV2Routes(app: FastifyInstance) {
    * Start a live location sharing session.
    * Body: { latitude, longitude, durationMinutes?, watcherIds? }
    */
-  app.post('/companion/sessions', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/companion/sessions', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { latitude, longitude, durationMinutes = 60, watcherIds = [] } = req.body as {
       latitude:          number
       longitude:         number
@@ -183,8 +184,8 @@ export async function securityV2Routes(app: FastifyInstance) {
    * Push a location update during an active session.
    * Body: { latitude, longitude }
    */
-  app.patch('/companion/sessions/:sessionId/location', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.patch('/companion/sessions/:sessionId/location', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { sessionId } = req.params as { sessionId: string }
     const { latitude, longitude } = req.body as { latitude: number; longitude: number }
 
@@ -203,8 +204,8 @@ export async function securityV2Routes(app: FastifyInstance) {
    * GET /companion/sessions/:sessionId
    * Get session details + current sharer location (sharer or watcher only).
    */
-  app.get('/companion/sessions/:sessionId', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/companion/sessions/:sessionId', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { sessionId } = req.params as { sessionId: string }
 
     try {
@@ -220,8 +221,8 @@ export async function securityV2Routes(app: FastifyInstance) {
    * DELETE /companion/sessions/:sessionId
    * End a session (sharer or watcher can end it).
    */
-  app.delete('/companion/sessions/:sessionId', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.delete('/companion/sessions/:sessionId', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { sessionId } = req.params as { sessionId: string }
 
     try {
@@ -236,8 +237,8 @@ export async function securityV2Routes(app: FastifyInstance) {
    * GET /companion/watching
    * List all active sessions where I am a watcher.
    */
-  app.get('/companion/watching', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/companion/watching', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     try {
       const sessions = await securityV2Service.getWatchedSessions(userId)
       return reply.send({ sessions })
@@ -251,8 +252,8 @@ export async function securityV2Routes(app: FastifyInstance) {
    * Panic trigger — broadcasts location to all trusted contacts immediately.
    * Body: { latitude, longitude }
    */
-  app.post('/companion/sos', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/companion/sos', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { latitude, longitude } = req.body as { latitude: number; longitude: number }
 
     if (latitude  == null) return reply.code(400).send({ error: 'latitude required' })

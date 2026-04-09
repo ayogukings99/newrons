@@ -17,13 +17,14 @@
 
 import { FastifyInstance } from 'fastify'
 import { grantsService, GrantStatus, GrantMilestone } from '../services/grants.service'
+import { requireAuth } from '../middleware/auth'
 
 export async function grantsRoutes(app: FastifyInstance) {
 
   // ── Applications ───────────────────────────────────────────────────────────
 
-  app.post('/applications', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/applications', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { title, description, impactStatement, requestedNxt, milestones } = req.body as {
       title:           string
       description:     string
@@ -77,8 +78,8 @@ export async function grantsRoutes(app: FastifyInstance) {
 
   // ── Milestones ─────────────────────────────────────────────────────────────
 
-  app.post('/applications/:id/milestones/:order/proof', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId              = (req as any).userId as string
+  app.post('/applications/:id/milestones/:order/proof', { preHandler: requireAuth }, async (req, reply) => {
+    const userId              = (req.user as { sub: string }).sub as string
     const { id, order }       = req.params as { id: string; order: string }
     const { proofUrl, notes } = req.body as { proofUrl: string; notes?: string }
 
@@ -98,8 +99,8 @@ export async function grantsRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post('/disbursements/:disbursementId/approve', { preHandler: [app.authenticate, app.requireAdmin] }, async (req, reply) => {
-    const userId             = (req as any).userId as string
+  app.post('/disbursements/:disbursementId/approve', { preHandler: [requireAuth, app.requireAdmin] }, async (req, reply) => {
+    const userId             = (req.user as { sub: string }).sub as string
     const { disbursementId } = req.params as { disbursementId: string }
 
     try {

@@ -19,6 +19,7 @@
 
 import { FastifyInstance } from 'fastify'
 import { clmService, ContributionType, ContributionDomain, SupportedCLMLang, ValidationVote } from '../services/clm.service'
+import { requireAuth } from '../middleware/auth'
 
 export async function clmRoutes(app: FastifyInstance) {
 
@@ -28,8 +29,8 @@ export async function clmRoutes(app: FastifyInstance) {
    * POST /contributions
    * Submit new language data.
    */
-  app.post('/contributions', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/contributions', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const {
       type, languageCode, domain, content,
       dialectTag, targetContent, targetLang, durationSecs,
@@ -64,8 +65,8 @@ export async function clmRoutes(app: FastifyInstance) {
    * GET /contributions/queue?languageCode=yo&domain=general&limit=10
    * Fetch contributions in the validation queue for the authenticated validator.
    */
-  app.get('/contributions/queue', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/contributions/queue', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { languageCode, domain, limit = '10' } = req.query as Record<string, string>
 
     try {
@@ -85,8 +86,8 @@ export async function clmRoutes(app: FastifyInstance) {
    * POST /contributions/:id/vote
    * Body: { vote: 'approve' | 'reject', reason? }
    */
-  app.post('/contributions/:id/vote', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/contributions/:id/vote', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { id }             = req.params as { id: string }
     const { vote, reason }   = req.body   as { vote: ValidationVote; reason?: string }
 
@@ -137,8 +138,8 @@ export async function clmRoutes(app: FastifyInstance) {
    * POST /dataset/versions  (admin/DAO execution only)
    * Body: { versionLabel, notes? }
    */
-  app.post('/dataset/versions', { preHandler: [app.authenticate, app.requireAdmin] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/dataset/versions', { preHandler: [requireAuth, app.requireAdmin] }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { versionLabel, notes } = req.body as { versionLabel: string; notes?: string }
 
     if (!versionLabel?.trim()) return reply.code(400).send({ error: 'versionLabel required' })
@@ -159,8 +160,8 @@ export async function clmRoutes(app: FastifyInstance) {
    * GET /contributors/me
    * My contribution stats and coin earnings.
    */
-  app.get('/contributors/me', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/contributors/me', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     try {
       const stats = await clmService.getContributorStats(userId)
       return reply.send(stats)

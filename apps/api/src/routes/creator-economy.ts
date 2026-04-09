@@ -32,13 +32,14 @@
 
 import { FastifyInstance } from 'fastify'
 import { creatorEconomyService, ContentType, PricingModel } from '../services/creator-economy.service'
+import { requireAuth } from '../middleware/auth'
 
 export async function creatorEconomyRoutes(app: FastifyInstance) {
 
   // ── Upload URL ────────────────────────────────────────────────────────────
 
-  app.post('/content/upload-url', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/content/upload-url', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { contentType, mimeType } = req.body as { contentType: ContentType; mimeType: string }
 
     if (!contentType || !mimeType) return reply.code(400).send({ error: 'contentType and mimeType required' })
@@ -53,8 +54,8 @@ export async function creatorEconomyRoutes(app: FastifyInstance) {
 
   // ── Publish content ───────────────────────────────────────────────────────
 
-  app.post('/content', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/content', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const {
       title, description, contentType, mediaKey, thumbnailKey,
       pricingModel, priceAmount, priceCurrency, tags, isPublished = false,
@@ -102,8 +103,8 @@ export async function creatorEconomyRoutes(app: FastifyInstance) {
 
   // ── My content ────────────────────────────────────────────────────────────
 
-  app.get('/content/mine', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/content/mine', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { limit = '20', offset = '0' } = req.query as Record<string, string>
     try {
       const items = await creatorEconomyService.listPublicContent({
@@ -121,7 +122,7 @@ export async function creatorEconomyRoutes(app: FastifyInstance) {
 
   app.get('/content/:contentId', async (req, reply) => {
     const { contentId } = req.params as { contentId: string }
-    const userId = (req as any).userId as string | undefined
+    const userId = (req.user as { sub: string }).sub as string | undefined
     try {
       const item = await creatorEconomyService.getContent(contentId, userId)
       return reply.send(item)
@@ -132,9 +133,9 @@ export async function creatorEconomyRoutes(app: FastifyInstance) {
 
   // ── Update content ────────────────────────────────────────────────────────
 
-  app.patch('/content/:contentId', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.patch('/content/:contentId', { preHandler: requireAuth }, async (req, reply) => {
     const { contentId } = req.params as { contentId: string }
-    const userId = (req as any).userId as string
+    const userId = (req.user as { sub: string }).sub as string
     const updates = req.body as {
       title?: string; description?: string; isPublished?: boolean
       priceAmount?: number; pricingModel?: PricingModel; tags?: string[]
@@ -149,9 +150,9 @@ export async function creatorEconomyRoutes(app: FastifyInstance) {
 
   // ── Purchase ──────────────────────────────────────────────────────────────
 
-  app.post('/content/:contentId/purchase', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/content/:contentId/purchase', { preHandler: requireAuth }, async (req, reply) => {
     const { contentId } = req.params as { contentId: string }
-    const userId = (req as any).userId as string
+    const userId = (req.user as { sub: string }).sub as string
     const { amountPaid, currency = 'NGN', paymentRef, affiliateCode } = req.body as {
       amountPaid: number; currency?: string; paymentRef: string; affiliateCode?: string
     }
@@ -171,9 +172,9 @@ export async function creatorEconomyRoutes(app: FastifyInstance) {
 
   // ── Tip ───────────────────────────────────────────────────────────────────
 
-  app.post('/content/:contentId/tip', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/content/:contentId/tip', { preHandler: requireAuth }, async (req, reply) => {
     const { contentId } = req.params as { contentId: string }
-    const userId = (req as any).userId as string
+    const userId = (req.user as { sub: string }).sub as string
     const { amount, currency = 'NGN', message, paymentRef } = req.body as {
       amount: number; currency?: string; message?: string; paymentRef: string
     }
@@ -193,9 +194,9 @@ export async function creatorEconomyRoutes(app: FastifyInstance) {
 
   // ── Subscriptions ─────────────────────────────────────────────────────────
 
-  app.post('/subscribe/:creatorId', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/subscribe/:creatorId', { preHandler: requireAuth }, async (req, reply) => {
     const { creatorId } = req.params as { creatorId: string }
-    const userId = (req as any).userId as string
+    const userId = (req.user as { sub: string }).sub as string
     const { plan, amount, currency = 'NGN', paymentRef } = req.body as {
       plan: 'monthly' | 'yearly'; amount: number; currency?: string; paymentRef: string
     }
@@ -214,9 +215,9 @@ export async function creatorEconomyRoutes(app: FastifyInstance) {
     }
   })
 
-  app.delete('/subscribe/:creatorId', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.delete('/subscribe/:creatorId', { preHandler: requireAuth }, async (req, reply) => {
     const { creatorId } = req.params as { creatorId: string }
-    const userId = (req as any).userId as string
+    const userId = (req.user as { sub: string }).sub as string
     try {
       await creatorEconomyService.cancelSubscription(userId, creatorId)
       return reply.send({ ok: true })
@@ -225,9 +226,9 @@ export async function creatorEconomyRoutes(app: FastifyInstance) {
     }
   })
 
-  app.get('/subscribe/:creatorId/check', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.get('/subscribe/:creatorId/check', { preHandler: requireAuth }, async (req, reply) => {
     const { creatorId } = req.params as { creatorId: string }
-    const userId = (req as any).userId as string
+    const userId = (req.user as { sub: string }).sub as string
     try {
       const active = await creatorEconomyService.checkSubscription(userId, creatorId)
       return reply.send({ subscribed: active })
@@ -238,9 +239,9 @@ export async function creatorEconomyRoutes(app: FastifyInstance) {
 
   // ── Affiliate ─────────────────────────────────────────────────────────────
 
-  app.post('/content/:contentId/affiliate', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/content/:contentId/affiliate', { preHandler: requireAuth }, async (req, reply) => {
     const { contentId } = req.params as { contentId: string }
-    const userId = (req as any).userId as string
+    const userId = (req.user as { sub: string }).sub as string
     const { commissionPct = 5 } = req.body as { commissionPct?: number }
     try {
       const result = await creatorEconomyService.createAffiliateLink(userId, contentId, commissionPct)
@@ -258,8 +259,8 @@ export async function creatorEconomyRoutes(app: FastifyInstance) {
 
   // ── Creator Dashboard ─────────────────────────────────────────────────────
 
-  app.get('/dashboard', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/dashboard', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     try {
       const stats = await creatorEconomyService.creatorStats(userId)
       return reply.send(stats)
@@ -268,8 +269,8 @@ export async function creatorEconomyRoutes(app: FastifyInstance) {
     }
   })
 
-  app.get('/payouts', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/payouts', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     try {
       const history = await creatorEconomyService.payoutHistory(userId)
       return reply.send(history)
@@ -278,8 +279,8 @@ export async function creatorEconomyRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post('/payouts/request', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/payouts/request', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { amount, currency = 'NGN', bankRef } = req.body as {
       amount: number; currency?: string; bankRef: string
     }

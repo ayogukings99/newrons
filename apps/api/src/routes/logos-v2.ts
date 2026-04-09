@@ -25,6 +25,7 @@
 
 import { FastifyInstance } from 'fastify'
 import { logosV2Service } from '../services/logos-v2.service'
+import { requireAuth } from '../middleware/auth'
 
 export async function logosV2Routes(app: FastifyInstance) {
 
@@ -57,8 +58,8 @@ export async function logosV2Routes(app: FastifyInstance) {
    * POST /protocols
    * Body: { graphId, title, description, triggerNodeId, isPublic?, languageCode? }
    */
-  app.post('/protocols', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/protocols', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const {
       graphId, title, description, triggerNodeId, isPublic = false, languageCode = 'en',
     } = req.body as {
@@ -138,7 +139,7 @@ export async function logosV2Routes(app: FastifyInstance) {
     // Prefer auth user id but allow anonymous ambient surfacing
     let resolvedUserId = userId
     try {
-      const authUserId = (req as any).userId
+      const authUserId = (req.user as { sub: string }).sub
       if (authUserId) resolvedUserId = authUserId
     } catch {}
 
@@ -197,7 +198,7 @@ export async function logosV2Routes(app: FastifyInstance) {
    * GET /kb/:kbId/gaps?topic=&languageCode=en
    * Analyzes a knowledge base for topical gaps.
    */
-  app.get('/kb/:kbId/gaps', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.get('/kb/:kbId/gaps', { preHandler: requireAuth }, async (req, reply) => {
     const { kbId }                        = req.params as { kbId: string }
     const { topic = '', languageCode = 'en' } = req.query as Record<string, string>
 

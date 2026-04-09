@@ -25,13 +25,14 @@
 
 import { FastifyInstance } from 'fastify'
 import { logosService, ContentType, RelType, Verdict } from '../services/logos.service'
+import { requireAuth } from '../middleware/auth'
 
 export async function logosRoutes(app: FastifyInstance) {
 
   // ── Nodes ─────────────────────────────────────────────────────────────────
 
-  app.post('/nodes', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/nodes', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const {
       title, content, contentType, languageCode,
       isPublic = true, sourceUrl, tags,
@@ -72,8 +73,8 @@ export async function logosRoutes(app: FastifyInstance) {
     }
   })
 
-  app.get('/nodes/mine', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/nodes/mine', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { limit = '20', offset = '0' } = req.query as Record<string, string>
     try {
       const nodes = await logosService.myNodes(userId, { limit: parseInt(limit), offset: parseInt(offset) })
@@ -85,7 +86,7 @@ export async function logosRoutes(app: FastifyInstance) {
 
   app.get('/nodes/:nodeId', async (req, reply) => {
     const { nodeId } = req.params as { nodeId: string }
-    const userId = (req as any).userId as string | undefined
+    const userId = (req.user as { sub: string }).sub as string | undefined
     try {
       const node = await logosService.getNode(nodeId, userId)
       return reply.send(node)
@@ -94,9 +95,9 @@ export async function logosRoutes(app: FastifyInstance) {
     }
   })
 
-  app.patch('/nodes/:nodeId', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.patch('/nodes/:nodeId', { preHandler: requireAuth }, async (req, reply) => {
     const { nodeId } = req.params as { nodeId: string }
-    const userId     = (req as any).userId as string
+    const userId     = (req.user as { sub: string }).sub as string
     const updates    = req.body as { title?: string; content?: string; isPublic?: boolean; tags?: string[] }
     try {
       await logosService.updateNode(nodeId, userId, updates)
@@ -106,9 +107,9 @@ export async function logosRoutes(app: FastifyInstance) {
     }
   })
 
-  app.delete('/nodes/:nodeId', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.delete('/nodes/:nodeId', { preHandler: requireAuth }, async (req, reply) => {
     const { nodeId } = req.params as { nodeId: string }
-    const userId     = (req as any).userId as string
+    const userId     = (req.user as { sub: string }).sub as string
     try {
       await logosService.deleteNode(nodeId, userId)
       return reply.send({ ok: true })
@@ -117,9 +118,9 @@ export async function logosRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post('/nodes/:nodeId/verify', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/nodes/:nodeId/verify', { preHandler: requireAuth }, async (req, reply) => {
     const { nodeId } = req.params as { nodeId: string }
-    const userId     = (req as any).userId as string
+    const userId     = (req.user as { sub: string }).sub as string
     const { verdict, reason } = req.body as { verdict: Verdict; reason: string }
 
     if (!verdict) return reply.code(400).send({ error: 'verdict required' })
@@ -134,8 +135,8 @@ export async function logosRoutes(app: FastifyInstance) {
 
   // ── Graphs ────────────────────────────────────────────────────────────────
 
-  app.post('/graphs', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/graphs', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const {
       title, description, nodeIds = [], isPublic = true, isProtocol = false,
     } = req.body as {
@@ -157,7 +158,7 @@ export async function logosRoutes(app: FastifyInstance) {
 
   app.get('/graphs/:graphId', async (req, reply) => {
     const { graphId } = req.params as { graphId: string }
-    const userId = (req as any).userId as string | undefined
+    const userId = (req.user as { sub: string }).sub as string | undefined
     try {
       const graph = await logosService.getGraph(graphId, userId)
       return reply.send(graph)
@@ -166,9 +167,9 @@ export async function logosRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post('/graphs/:graphId/edges', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/graphs/:graphId/edges', { preHandler: requireAuth }, async (req, reply) => {
     const { graphId } = req.params as { graphId: string }
-    const userId = (req as any).userId as string
+    const userId = (req.user as { sub: string }).sub as string
     const { fromNodeId, toNodeId, relationship, weight = 1.0 } = req.body as {
       fromNodeId: string; toNodeId: string; relationship: RelType; weight?: number
     }
@@ -185,9 +186,9 @@ export async function logosRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post('/graphs/:graphId/fork', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/graphs/:graphId/fork', { preHandler: requireAuth }, async (req, reply) => {
     const { graphId } = req.params as { graphId: string }
-    const userId = (req as any).userId as string
+    const userId = (req.user as { sub: string }).sub as string
     try {
       const forkedId = await logosService.forkGraph(graphId, userId)
       return reply.code(201).send({ graphId: forkedId })
@@ -219,8 +220,8 @@ export async function logosRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post('/synthesize', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/synthesize', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { question, languageCode = 'en', topK = 8 } = req.body as {
       question: string; languageCode?: string; topK?: number
     }

@@ -22,6 +22,7 @@
 
 import { FastifyInstance } from 'fastify'
 import { translationService, SupportedLang } from '../services/translation.service'
+import { requireAuth } from '../middleware/auth'
 
 export async function translationRoutes(app: FastifyInstance) {
 
@@ -99,7 +100,7 @@ export async function translationRoutes(app: FastifyInstance) {
    * Body: { audioBase64, sourceLang, targetLang, synthesize? }
    * Transcribes speech, translates, and optionally synthesizes back to audio.
    */
-  app.post('/audio', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/audio', { preHandler: requireAuth }, async (req, reply) => {
     const { audioBase64, sourceLang, targetLang, synthesize = false } = req.body as {
       audioBase64: string
       sourceLang:  SupportedLang
@@ -128,8 +129,8 @@ export async function translationRoutes(app: FastifyInstance) {
    * Create a live translation session for Group Audio captions.
    * Body: { roomId, sourceLang, targetLangs }
    */
-  app.post('/sessions', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/sessions', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { roomId, sourceLang, targetLangs } = req.body as {
       roomId:      string
       sourceLang:  SupportedLang
@@ -156,7 +157,7 @@ export async function translationRoutes(app: FastifyInstance) {
    * DELETE /sessions/:sessionId
    * End a live translation session.
    */
-  app.delete('/sessions/:sessionId', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.delete('/sessions/:sessionId', { preHandler: requireAuth }, async (req, reply) => {
     const { sessionId } = req.params as { sessionId: string }
 
     try {

@@ -19,6 +19,7 @@
 
 import { FastifyInstance } from 'fastify'
 import { avatarNFTService, AvatarTrait } from '../services/avatar-nft.service'
+import { requireAuth } from '../middleware/auth'
 
 export async function avatarNFTRoutes(app: FastifyInstance) {
 
@@ -28,8 +29,8 @@ export async function avatarNFTRoutes(app: FastifyInstance) {
    * POST /mint
    * Body: { avatarName, imageUrl, traits, description? }
    */
-  app.post('/mint', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/mint', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { avatarName, imageUrl, traits, description } = req.body as {
       avatarName:   string
       imageUrl:     string
@@ -52,8 +53,8 @@ export async function avatarNFTRoutes(app: FastifyInstance) {
   /**
    * GET /mine
    */
-  app.get('/mine', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.get('/mine', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     try {
       const nft = await avatarNFTService.getUserAvatarNFT(userId)
       if (!nft) return reply.code(404).send({ error: 'No avatar NFT minted yet' })
@@ -68,8 +69,8 @@ export async function avatarNFTRoutes(app: FastifyInstance) {
    * Body: { traits: AvatarTrait[] }
    * Add or update traits on your minted avatar.
    */
-  app.patch('/traits', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.patch('/traits', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { traits } = req.body as { traits: AvatarTrait[] }
 
     if (!Array.isArray(traits) || traits.length === 0) {
@@ -103,8 +104,8 @@ export async function avatarNFTRoutes(app: FastifyInstance) {
    * POST /marketplace/list
    * Body: { priceNxt }
    */
-  app.post('/marketplace/list', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/marketplace/list', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { priceNxt } = req.body as { priceNxt: number }
 
     if (!priceNxt || priceNxt <= 0) return reply.code(400).send({ error: 'priceNxt must be a positive number' })
@@ -121,8 +122,8 @@ export async function avatarNFTRoutes(app: FastifyInstance) {
    * DELETE /marketplace/list
    * Cancel my active listing.
    */
-  app.delete('/marketplace/list', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.delete('/marketplace/list', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     try {
       await avatarNFTService.cancelListing(userId)
       return reply.send({ ok: true })
@@ -135,8 +136,8 @@ export async function avatarNFTRoutes(app: FastifyInstance) {
    * POST /marketplace/buy
    * Body: { mintAddress }
    */
-  app.post('/marketplace/buy', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/marketplace/buy', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { mintAddress } = req.body as { mintAddress: string }
 
     if (!mintAddress?.trim()) return reply.code(400).send({ error: 'mintAddress required' })

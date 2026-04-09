@@ -20,13 +20,14 @@
 import { FastifyInstance }  from 'fastify'
 import { logosPublicService, GraphPricingModel } from '../services/logos-public.service'
 import { developerService } from '../services/developer.service'
+import { requireAuth } from '../middleware/auth'
 
 export async function logosPublicRoutes(app: FastifyInstance) {
 
   // ── Graph Registry ─────────────────────────────────────────────────────────
 
-  app.post('/graphs', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string
+  app.post('/graphs', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = (req.user as { sub: string }).sub as string
     const { graphId, name, description, languageCode, pricingModel, pricePerQueryNxt } = req.body as {
       graphId:           string
       name:              string
@@ -71,8 +72,8 @@ export async function logosPublicRoutes(app: FastifyInstance) {
     }
   })
 
-  app.get('/graphs/:graphId/analytics', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId    = (req as any).userId as string
+  app.get('/graphs/:graphId/analytics', { preHandler: requireAuth }, async (req, reply) => {
+    const userId    = (req.user as { sub: string }).sub as string
     const { graphId } = req.params as { graphId: string }
 
     try {
@@ -83,8 +84,8 @@ export async function logosPublicRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post('/graphs/:graphId/rate', { preHandler: [app.authenticate] }, async (req, reply) => {
-    const userId    = (req as any).userId as string
+  app.post('/graphs/:graphId/rate', { preHandler: requireAuth }, async (req, reply) => {
+    const userId    = (req.user as { sub: string }).sub as string
     const { graphId } = req.params as { graphId: string }
     const { stars, comment } = req.body as { stars: number; comment?: string }
 
@@ -166,7 +167,7 @@ export async function logosPublicRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post('/federation', { preHandler: [app.authenticate, app.requireAdmin] }, async (req, reply) => {
+  app.post('/federation', { preHandler: [requireAuth, app.requireAdmin] }, async (req, reply) => {
     const { institutionId, institutionName, graphId, graphName, endpointUrl, trustLevel } = req.body as {
       institutionId:   string
       institutionName: string
