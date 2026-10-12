@@ -25,3 +25,34 @@ CREATE TABLE IF NOT EXISTS rhythmic_tap_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_tap_log_sender ON rhythmic_tap_log(sender_did, created_at DESC);
+
+-- ── ROW LEVEL SECURITY (follows 013 conventions) ─────────────────────────────
+-- face_enrollments: own-DID rows only (clients can enroll/rotate/delete their
+-- own template hash — erasure included; writes always carry the hash, never
+-- images, enforced by API contract and audited in VS4).
+-- rhythmic_tap_log: read-own (sender or receiver); writes are service-role-only
+-- (API settles value, then logs). service_role bypasses RLS throughout.
+
+ALTER TABLE face_enrollments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rhythmic_tap_log ENABLE ROW LEVEL SECURITY;
+
+GRANT SELECT, INSERT, UPDATE ON face_enrollments TO authenticated;
+GRANT SELECT ON rhythmic_tap_log TO authenticated;
+
+DROP POLICY IF EXISTS "users_manage_own_face_enrollment" ON face_enrollments;
+CREATE POLICY "users_manage_own_face_enrollment"
+  ON face_enrollments FOR ALL TO authenticated
+  USING (
+    did IN (SELECT did FROM node_identities WHERE user_id = (SELECT id FROM users WHERE auth_id = auth.uid()))
+  )
+  WITH CHECK (
+    did IN (SELECT did FROM node_identities WHERE user_id = (SELECT id FROM users WHERE auth_id = auth.uid()))
+  );
+
+DROP POLICY IF EXISTS "users_see_own_taps" ON rhythmic_tap_log;
+CREATE POLICY "users_see_own_taps"
+  ON rhythmic_tap_log FOR SELECT TO authenticated
+  USING (
+    sender_did IN (SELECT did FROM node_identities WHERE user_id = (SELECT id FROM users WHERE auth_id = auth.uid()))
+    OR receiver_did IN (SELECT did FROM node_identities WHERE user_id = (SELECT id FROM users WHERE auth_id = auth.uid()))
+  );

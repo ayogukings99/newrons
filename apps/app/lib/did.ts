@@ -10,9 +10,33 @@ function b58(bytes: Uint8Array): string {
   const ALPH = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
   let num = BigInt('0x' + [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')) || 0n;
   let out = '';
-  for (const b of bytes) if (b === 0) out += '1';
+  // Only LEADING zeroes become '1's — an interior zero must not add one,
+  // or the DID decodes to extra bytes and the server rejects the key.
+  for (const b of bytes) {
+    if (b !== 0) break;
+    out += '1';
+  }
   while (num > 0n) { out = ALPH[Number(num % 58n)] + out; num /= 58n; }
   return out || '1';
+}
+
+// WebCrypto ECDSA signatures are raw R||S; servers (Node/JWS) expect DER.
+function derEncodeECDSA(raw: Uint8Array): Uint8Array {
+  const norm = (v: Uint8Array): Uint8Array => {
+    let i = 0;
+    while (i < v.length - 1 && v[i] === 0) i++;
+    const s = v.subarray(i);
+    return s[0] & 0x80 ? Uint8Array.of(0, ...s) : s;
+  };
+  const r = norm(raw.subarray(0, 32));
+  const s = norm(raw.subarray(32, 64));
+  const out = new Uint8Array(6 + r.length + s.length);
+  out[0] = 0x30; out[1] = 4 + r.length + s.length;
+  out[2] = 0x02; out[3] = r.length;
+  out.set(r, 4);
+  out[4 + r.length] = 0x02; out[5 + r.length] = s.length;
+  out.set(s, 6 + r.length);
+  return out;
 }
 
 export async function getOrCreateNode(): Promise<{ did: NodeDID; pubB58: string }> {
@@ -44,9 +68,11 @@ export async function signNonce(nonce: string): Promise<string> {
     false, ['sign'],
   );
   const data = new TextEncoder().encode(nonce);
-  const sig = new Uint8Array(await crypto.subtle.sign(
+  const rawSig = new Uint8Array(await crypto.subtle.sign(
     algo === 'Ed25519' ? ({ name: 'Ed25519' } as AlgorithmIdentifier) : { name: 'ECDSA', hash: 'SHA-256' },
     key, data,
   ));
+  // Ed25519 stays raw 64-byte; ECDSA goes out DER-encoded (what verifiers expect).
+  const sig = algo === 'Ed25519' ? rawSig : derEncodeECDSA(rawSig);
   return [...sig].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

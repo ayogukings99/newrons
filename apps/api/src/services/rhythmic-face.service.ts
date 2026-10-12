@@ -17,6 +17,12 @@ interface Assertion {
 const assertions = new Map<string, Assertion>()
 export const ASSERTION_TTL_MS = 2 * 60_000
 
+// Swept alongside the rate-limit stores so spent assertions never accumulate.
+setInterval(() => {
+  const now = Date.now()
+  for (const [k, v] of assertions) if (v.spent || now > v.expiresAt) assertions.delete(k)
+}, 5 * 60_000).unref?.()
+
 export function isTemplateHash(s: string): boolean {
   return /^[0-9a-fA-F]{64}$/.test(s)
 }
@@ -46,8 +52,8 @@ export class RhythmicFaceService {
     return { assertionId, expiresAt: new Date(Date.now() + ASSERTION_TTL_MS).toISOString() }
   }
 
-  /** Consume a single-use assertion. Throws on reuse, expiry, or DID mismatch. */
-  consume(assertionId: string, did: string): void {
+  /** Validate without spending — call this BEFORE the guarded action. */
+  peek(assertionId: string, did: string): void {
     const a = assertions.get(assertionId)
     if (!a || a.did !== did) throw new Error('Unknown face assertion')
     if (a.spent) throw new Error('Face assertion already spent')
@@ -55,6 +61,11 @@ export class RhythmicFaceService {
       assertions.delete(assertionId)
       throw new Error('Face assertion expired — verify again')
     }
-    a.spent = true
+  }
+
+  /** Consume a single-use assertion. Throws on reuse, expiry, or DID mismatch. */
+  consume(assertionId: string, did: string): void {
+    this.peek(assertionId, did)
+    assertions.get(assertionId)!.spent = true
   }
 }

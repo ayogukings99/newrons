@@ -43,29 +43,66 @@ export async function optionalAuth(req: FastifyRequest): Promise<string | null> 
 }
 
 /**
- * Rate limiter hook — basic in-memory rate limiting per IP.
+ * Rate limiter hook — in-memory, per bucket (NOT shared across limiters).
+ * Keyed by IP for anonymous routes; callers may pass a finer key (e.g. DID).
+ * Requires periodic sweep() on long-lived instances — see startRateLimitSweep.
  * In production: use Redis-based rate limiter.
  */
-const rateLimitStore = new Map<string, { count: number; resetAt: number }>()
+const rateLimitStores = new Map<string, Map<string, { count: number; resetAt: number }>>()
 
-export function createRateLimit(maxRequests: number, windowMs: number) {
-  return async (req: FastifyRequest, reply: FastifyReply) => {
-    const key = req.ip
-    const now = Date.now()
-    const entry = rateLimitStore.get(key)
-
-    if (!entry || now > entry.resetAt) {
-      rateLimitStore.set(key, { count: 1, resetAt: now + windowMs })
-      return
-    }
-
-    if (entry.count >= maxRequests) {
-      reply.header('Retry-After', Math.ceil((entry.resetAt - now) / 1000))
-      return reply.code(429).send({ error: 'Too many requests — please slow down' })
-    }
-
-    entry.count++
+export function createRateLimit(maxRequests: number, windowMs: number, bucket?: string) {
+  const name = bucket ?? `${maxRequests}/${windowMs}/${rateLimitStores.size}`
+  let store = rateLimitStores.get(name)
+  if (!store) {
+    store = new Map()
+    rateLimitStores.set(name, store)
   }
+  const bucketStore = store
+  return Object.assign(
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      // Prefer DID over IP where the caller is already authenticated —
+      // cybercafes/NAT put many real users behind one egress IP.
+      const actor = (req.node?.did as string | undefined) ?? (req.user as { sub?: string } | undefined)?.sub
+      const key = actor ? `${req.ip}|${actor}` : req.ip
+      const now = Date.now()
+      const entry = bucketStore.get(key)
+
+      if (!entry || now > entry.resetAt) {
+        bucketStore.set(key, { count: 1, resetAt: now + windowMs })
+        return
+      }
+
+      if (entry.count >= maxRequests) {
+        reply.header('Retry-After', Math.ceil((entry.resetAt - now) / 1000))
+        return reply.code(429).send({ error: 'Too many requests — please slow down' })
+      }
+
+      entry.count++
+    },
+    { bucket: name },
+  )
+}
+
+/** Drop expired entries across all limiter buckets. Run every few minutes. */
+export function sweepRateLimits(now = Date.now()): number {
+  let dropped = 0
+  for (const store of rateLimitStores.values()) {
+    for (const [key, entry] of store) {
+      if (now > entry.resetAt) {
+        store.delete(key)
+        dropped++
+      }
+    }
+  }
+  return dropped
+}
+
+let sweepTimer: ReturnType<typeof setInterval> | null = null
+
+export function startRateLimitSweep(intervalMs = 5 * 60_000) {
+  if (sweepTimer) return
+  sweepTimer = setInterval(() => sweepRateLimits(), intervalMs)
+  sweepTimer.unref?.()
 }
 
 // Pre-built rate limits

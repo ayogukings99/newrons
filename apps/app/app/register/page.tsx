@@ -37,7 +37,7 @@ export default function Register() {
       <FaceCapture onDone={(h) => setFaceHash(h)} />
       <p style={{ fontSize: 13 }}>{faceHash ? `template ${faceHash.slice(0, 16)}… locked` : 'No face template.'}</p>
       <button onClick={finish}>2 · Prove + enter</button>
-      <p style={{ fontSize: 13 }}>{msg}</p>
+      <p aria-live="polite" style={{ fontSize: 13 }}>{msg}</p>
       {token && <p style={{ fontSize: 12, wordBreak: 'break-all' }}>cap: {token.slice(0, 24)}…</p>}
     </div>
   );
