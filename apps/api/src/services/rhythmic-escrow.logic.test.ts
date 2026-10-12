@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ESCROW_SEED, KIND_TO_U8, STATE_TO_U8, CREDIT_BASE,
+  ESCROW_SEED, KIND_TO_U8, STATE_TO_U8, CREDIT_BASE, FACE_THRESHOLD_NXT,
   assertPhase1Kind, assertTransition, canTransition,
-  applyCredit, escrowIdBuffer, findEscrowPda, isRapidCycling,
+  applyCredit, escrowIdBuffer, findEscrowPda, isRapidCycling, mergeOutbox,
 } from './rhythmic-escrow.logic'
 
 // Pure-logic tests — no env, no supabase. Mirror of contracts/escrow/src/lib.rs.
@@ -58,6 +58,19 @@ describe('PDA derivation', () => {
   it('rejects non-uuid escrow keys', () => {
     expect(() => escrowIdBuffer('not-a-uuid')).toThrow()
     expect(escrowIdBuffer('123e4567-e89b-12d3-a456-426614174000')).toHaveLength(16)
+  })
+})
+
+describe('face gate + offline outbox', () => {
+  it('gates instant transfers at 50 NXT', () => {
+    expect(FACE_THRESHOLD_NXT).toBe(50)
+  })
+  it('dedupes the outbox by idempotency key and caps at 50', () => {
+    const mk = (key: string) => ({ key, to: 'did:scn:x', amountNxt: 1, queuedAt: new Date().toISOString() })
+    const merged = mergeOutbox([mk('a')], [mk('a'), mk('b')])
+    expect(merged.map((t) => t.key)).toEqual(['a', 'b'])
+    const big = Array.from({ length: 60 }, (_, i) => mk(`k${i}`))
+    expect(mergeOutbox([], big)).toHaveLength(50)
   })
 })
 

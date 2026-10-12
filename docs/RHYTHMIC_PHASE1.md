@@ -24,6 +24,12 @@ not replaced. New surface is minimal:
   Anchor program source ships in `contracts/escrow` (devnet deploy pending
   toolchain — see its README). Migration 014 must be applied to Supabase
   alongside the still-pending 013.
+- VS3 (branch `phase-1/vs3-street-ready`, this branch): street-ready hardening —
+  server-issued single-use face assertions (`face_enrollments`, 2-min TTL,
+  equality match; fuzzy model is VS4+) replacing trusted client strings;
+  offline tap outbox (localStorage, idempotent flush via `tap/sync-offline`,
+  cap 50, face re-lock needed after expiry); live Mirror aggregates
+  (`GET /mirror`, Ghost-safe counts only). Migration 015 pending with 013/014.
 - VS3: street-ready QR + face-threshold + offline queue (reuse sync-offline).
 - VS4: hardening (CSP, rate-limit tuning, WCAG pass, low-end Android, PWA offline).
 

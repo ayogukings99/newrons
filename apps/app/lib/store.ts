@@ -23,3 +23,29 @@ export const consentLog = {
   all(): ConsentEntry[] { try { return JSON.parse(localStorage.getItem(CONSENT) || '[]'); } catch { return []; } },
   add(e: ConsentEntry) { localStorage.setItem(CONSENT, JSON.stringify([...consentLog.all(), e].slice(-200))); },
 };
+
+// Offline tap outbox — queued when the network is down, flushed on reconnect.
+// Each tap carries its own idempotency key so retries settle exactly once.
+export interface QueuedTap {
+  key: string; to: string; amountNxt: number; faceHash?: string; queuedAt: string;
+}
+const OUTBOX = 'newrons.tap.outbox.v1';
+const uuid = () =>
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+export const outbox = {
+  all(): QueuedTap[] { try { return JSON.parse(localStorage.getItem(OUTBOX) || '[]'); } catch { return []; } },
+  enqueue(t: Omit<QueuedTap, 'key' | 'queuedAt'>): QueuedTap {
+    const item = { ...t, key: uuid(), queuedAt: new Date().toISOString() };
+    const seen = new Set(outbox.all().map((x) => x.key));
+    const next = [...outbox.all(), item].filter((x) => seen.has(x.key) || (seen.add(x.key), true)).slice(-50);
+    localStorage.setItem(OUTBOX, JSON.stringify(next));
+    return item;
+  },
+  remove(key: string) {
+    localStorage.setItem(OUTBOX, JSON.stringify(outbox.all().filter((x) => x.key !== key)));
+  },
+  get pending(): number { return outbox.all().length; },
+};

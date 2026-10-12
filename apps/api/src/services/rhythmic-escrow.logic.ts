@@ -84,6 +84,25 @@ export function newEscrowKey(): string {
   return randomUUID()
 }
 
+// ── Face gate + offline outbox ────────────────────────────────────────────────
+
+/** Instant transfers at or above this NXT amount need a server face assertion. */
+export const FACE_THRESHOLD_NXT = 50
+
+export interface QueuedTap {
+  key: string
+  to: string
+  amountNxt: number
+  faceHash?: string
+  queuedAt: string
+}
+
+/** Merge an offline outbox: dedupe by idempotency key, cap at 50 (NFC rails parity). */
+export function mergeOutbox(existing: QueuedTap[], incoming: QueuedTap[]): QueuedTap[] {
+  const seen = new Set(existing.map((t) => t.key))
+  return [...existing, ...incoming.filter((t) => !seen.has(t.key) && (seen.add(t.key), true))].slice(-50)
+}
+
 // ── Anti-collusion heuristics ─────────────────────────────────────────────────
 // Rapid same-pair cycling (lock→reverse loops farming credit events) is the
 // cheapest farming pattern. >3 same-pair escrows in 10 min → disputed.

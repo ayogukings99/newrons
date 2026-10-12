@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { createRateLimit } from '../middleware/auth'
 import { requireNodeAuth } from '../middleware/node-auth'
 import { RhythmicEscrowService } from '../services/rhythmic-escrow.service'
+import { RhythmicFaceService } from '../services/rhythmic-face.service'
+import { FACE_THRESHOLD_NXT } from '../services/rhythmic-escrow.logic'
 
 // Rhythmic OS Phase-1 routes (VS1 sovereign entry + VS2 escrow/credit/tap).
 // Testnet only. Value moves via process_wallet_transfer in NXT-reserve mode;
@@ -40,6 +42,24 @@ const TapQuoteSchema = z.object({
 })
 const TapSubmitSchema = TapQuoteSchema.extend({
   faceAssertionId: z.string().min(8).optional(),
+  idempotencyKey: z.string().uuid().optional(),
+  offlineCreatedAt: z.string().datetime().optional(),
+})
+const FaceEnrollSchema = z.object({
+  templateHash: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  consent: z.literal(true, { errorMap: () => ({ message: 'Explicit consent required' }) }),
+})
+const FaceVerifySchema = z.object({
+  templateHash: z.string().regex(/^[0-9a-fA-F]{64}$/),
+})
+const OfflineSyncSchema = z.object({
+  taps: z.array(z.object({
+    to: DidSchema,
+    amountNXT: z.number().positive().max(1_000_000),
+    faceAssertionId: z.string().min(8).optional(),
+    idempotencyKey: z.string().uuid(),
+    offlineCreatedAt: z.string().datetime(),
+  })).max(50),
 })
 
 // In-memory nonce store (single-instance dev; move to Redis before production).
@@ -145,13 +165,36 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
     }
   })
 
-  // POST /api/v1/rhythmic/tap/quote — price a tap (face gate threshold: 50 NXT)
+  // POST /api/v1/rhythmic/face/enroll — store template HASH with consent (never images)
+  app.post('/face/enroll', { preHandler: requireNodeAuth }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const body = FaceEnrollSchema.parse(req.body)
+    try {
+      await new RhythmicFaceService().enroll(callerDid(req), body.templateHash, body.consent)
+      return reply.code(201).send({ data: { enrolled: true, testnet: true } })
+    } catch (err) {
+      return reply.code(400).send({ error: (err as Error).message })
+    }
+  })
+
+  // POST /api/v1/rhythmic/face/verify — mint a 2-minute single-use assertion
+  app.post('/face/verify', { preHandler: requireNodeAuth }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const body = FaceVerifySchema.parse(req.body)
+    try {
+      const a = await new RhythmicFaceService().verify(callerDid(req), body.templateHash)
+      return reply.send({ data: { ...a, testnet: true } })
+    } catch (err) {
+      return reply.code(401).send({ error: (err as Error).message })
+    }
+  })
+
+  // POST /api/v1/rhythmic/tap/quote — price a tap (face gate at FACE_THRESHOLD_NXT)
   app.post('/tap/quote', { preHandler: requireNodeAuth }, async (req: FastifyRequest, reply: FastifyReply) => {
     const body = TapQuoteSchema.parse(req.body)
     return reply.send({
       data: {
         to: body.to, amountNXT: body.amountNXT,
-        requiresFace: body.amountNXT >= 50,
+        requiresFace: body.amountNXT >= FACE_THRESHOLD_NXT,
+        faceThresholdNXT: FACE_THRESHOLD_NXT,
         expiresAt: new Date(Date.now() + 2 * 60_000).toISOString(),
         testnet: true,
       },
@@ -169,12 +212,48 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
             receiverDid: body.to,
             amountNxt: body.amountNXT,
             faceAssertionId: body.faceAssertionId,
+            idempotencyKey: body.idempotencyKey,
+            offlineCreatedAt: body.offlineCreatedAt,
           })),
           testnet: true,
         },
       })
     } catch (err) {
       return reply.code(400).send({ error: (err as Error).message })
+    }
+  })
+
+  // POST /api/v1/rhythmic/tap/sync-offline — settle queued offline taps (max 50, idempotent)
+  app.post('/tap/sync-offline', { preHandler: requireNodeAuth }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const body = OfflineSyncSchema.parse(req.body)
+    const senderDid = callerDid(req)
+    const results = []
+    for (const tap of body.taps) {
+      try {
+        const r = await service.tapTransfer({
+          senderDid,
+          receiverDid: tap.to,
+          amountNxt: tap.amountNXT,
+          faceAssertionId: tap.faceAssertionId,
+          idempotencyKey: tap.idempotencyKey,
+          offlineCreatedAt: tap.offlineCreatedAt,
+        })
+        results.push({ key: tap.idempotencyKey, ok: true, duplicate: r.duplicate })
+      } catch (err) {
+        results.push({ key: tap.idempotencyKey, ok: false, error: (err as Error).message })
+      }
+    }
+    return reply.send({ data: { results, testnet: true } })
+  })
+
+  // GET /api/v1/rhythmic/mirror — Ghost-safe aggregates only (no DIDs, no per-node data)
+  app.get('/mirror', async (_req: FastifyRequest, reply: FastifyReply) => {
+    try {
+      return reply.send({ data: { ...(await service.mirrorStats()), testnet: true } })
+    } catch {
+      return reply.send({
+        data: { escrows: {}, creditAvg: 50, creditNodes: 0, taps: 0, tapVolumeNxt: 0, migrated: false, testnet: true },
+      })
     }
   })
 
