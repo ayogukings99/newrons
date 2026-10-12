@@ -182,10 +182,14 @@ export class RhythmicEscrowService {
     idempotencyKey?: string; offlineCreatedAt?: string;
   }): Promise<{ ok: boolean; requiresFace: boolean; duplicate: boolean }> {
     const requiresFace = params.amountNxt >= FACE_THRESHOLD_NXT
+    const face = new RhythmicFaceService()
     if (requiresFace) {
       // Server-issued, single-use assertion — client strings are NOT trusted.
+      // Validated (not spent) up front; spent only after value moves, so a
+      // failed transfer doesn't cost the user another face verification.
+      // Replay is safe: idempotency keys dedupe re-settlement below.
       if (!params.faceAssertionId) throw new Error('Face assertion required at or above 50 NXT')
-      new RhythmicFaceService().consume(params.faceAssertionId, params.senderDid)
+      face.peek(params.faceAssertionId, params.senderDid)
     }
     if (params.senderDid === params.receiverDid) throw new Error('Self-transfer is forbidden')
 
@@ -215,6 +219,10 @@ export class RhythmicEscrowService {
       amount_nxt: params.amountNxt,
       offline_created_at: params.offlineCreatedAt ?? null,
     })
+    // Value moved — now burn the assertion so it can't settle a second tap.
+    if (requiresFace && params.faceAssertionId) {
+      face.consume(params.faceAssertionId, params.senderDid)
+    }
     await this.mintCredit(params.senderDid, 0, 'tap_transfer', null)
     return { ok: true, requiresFace, duplicate: false }
   }

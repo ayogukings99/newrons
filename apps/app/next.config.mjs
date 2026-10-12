@@ -6,11 +6,15 @@ const nextConfig = {
   // Camera access stays available to OUR origin only (face-capture needs it);
   // everything else that could exfiltrate or embed is denied.
   async headers() {
+    const isProd = process.env.NODE_ENV === 'production';
     return [
       {
         source: '/:path*',
         headers: [
-          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+          // HSTS in production only — Chrome honors it on localhost too.
+          ...(isProd
+            ? [{ key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' }]
+            : []),
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'no-referrer' },

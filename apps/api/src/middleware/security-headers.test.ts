@@ -8,7 +8,8 @@ describe('security-headers', () => {
     app.addHook('onSend', securityHeaders)
     app.get('/ping', async () => ({ ok: true }))
     const res = await app.inject({ method: 'GET', url: '/ping' })
-    expect(res.headers['strict-transport-security']).toContain('max-age=31536000')
+    // inject() reports hostname localhost → HSTS correctly withheld in dev.
+    expect(res.headers['strict-transport-security']).toBeUndefined()
     expect(res.headers['x-content-type-options']).toBe('nosniff')
     expect(res.headers['x-frame-options']).toBe('DENY')
     expect(res.headers['referrer-policy']).toBe('no-referrer')

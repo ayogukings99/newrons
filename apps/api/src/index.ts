@@ -21,6 +21,7 @@ import quizzesRoutes from './routes/quizzes'
 import integrationRoutes from './routes/integration'
 import rhythmicRoutes from './routes/rhythmic'
 import { securityHeaders } from './middleware/security-headers'
+import { startRateLimitSweep } from './middleware/auth'
 
 const app = Fastify({ logger: { level: config.LOG_LEVEL } })
 
@@ -35,6 +36,8 @@ if (!process.env.VERCEL) {
 
 // Security headers on every response (VS4 hardening)
 app.addHook('onSend', securityHeaders)
+// Bound the in-memory rate-limit/nonce stores on long-lived instances
+startRateLimitSweep()
 
 // Routes — v1
 const API_PREFIX = '/api/v1'

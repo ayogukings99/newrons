@@ -16,6 +16,9 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  // Only cacheable navigations/assets: non-GETs pass straight through
+  // (Cache.match on POST bodies throws on some browsers).
+  if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
   // Never cache API traffic or cross-origin calls.
   if (url.pathname.startsWith('/api/') || url.origin !== self.location.origin) return;

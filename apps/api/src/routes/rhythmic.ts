@@ -64,11 +64,20 @@ const OfflineSyncSchema = z.object({
 })
 
 // In-memory nonce store (single-instance dev; move to Redis before production).
+// Swept alongside the rate-limit stores so abandoned challenges never accumulate.
 const nonces = new Map<string, { did: string; expiresAt: number }>()
 
-function callerDid(req: FastifyRequest): string {
+setInterval(() => {
+  const now = Date.now()
+  for (const [k, v] of nonces) if (now > v.expiresAt) nonces.delete(k)
+}, 5 * 60_000).unref?.()
+
+function callerDid(req: FastifyRequest, reply: FastifyReply): string | null {
   const did = req.node?.did
-  if (!did) throw new Error('No sovereign DID on this credential — register a node first')
+  if (!did) {
+    reply.code(403).send({ error: 'No sovereign DID on this credential — register a node first' })
+    return null
+  }
   return did
 }
 
@@ -105,11 +114,13 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
 
   // GET /api/v1/rhythmic/credit/me — soulbound score + event history
   app.get('/credit/me', { preHandler: requireNodeAuth }, async (req: FastifyRequest, reply: FastifyReply) => {
+    const did = callerDid(req, reply)
+    if (!did) return
     try {
-      return reply.send({ data: { ...(await service.creditView(callerDid(req))), soulbound: true, testnet: true } })
+      return reply.send({ data: { ...(await service.creditView(did)), soulbound: true, testnet: true } })
     } catch (err) {
       // Pre-migration 014 fallback: base score, empty history.
-      return reply.send({ data: { did: callerDid(req), score: 50, history: [], soulbound: true, testnet: true, migrated: false } })
+      return reply.send({ data: { did, score: 50, history: [], soulbound: true, testnet: true, migrated: false } })
     }
   })
 
@@ -121,9 +132,11 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
         error: 'Settlement kind reserved for Phase 4 (brush packs / live classes). Interface frozen, execution not yet enabled.',
       })
     }
+    const payerDid = callerDid(req, reply)
+    if (!payerDid) return
     try {
       const esc = await service.create({
-        payerDid: callerDid(req),
+        payerDid,
         counterpartyDid: body.counterparty,
         amountNxt: body.amountNXT,
         kind: body.kind,
@@ -145,8 +158,10 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
 
   // POST /api/v1/rhythmic/escrow/:id/accept — counterparty accepts
   app.post<{ Params: { id: string } }>('/escrow/:id/accept', { preHandler: requireNodeAuth }, async (req, reply) => {
+    const did = callerDid(req, reply)
+    if (!did) return
     try {
-      return reply.send({ data: { ...(await service.accept(req.params.id, callerDid(req))), testnet: true } })
+      return reply.send({ data: { ...(await service.accept(req.params.id, did)), testnet: true } })
     } catch (err) {
       return reply.code(400).send({ error: (err as Error).message })
     }
@@ -155,8 +170,10 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
   // POST /api/v1/rhythmic/escrow/:id/release — payer co-sign (dual) or live proof
   app.post<{ Params: { id: string } }>('/escrow/:id/release', { preHandler: requireNodeAuth }, async (req, reply) => {
     const body = ReleaseSchema.parse(req.body ?? {})
+    const did = callerDid(req, reply)
+    if (!did) return
     try {
-      const esc = await service.release(req.params.id, callerDid(req), body.liveProofHash)
+      const esc = await service.release(req.params.id, did, body.liveProofHash)
       return reply.send({ data: { ...esc, testnet: true } })
     } catch (err) {
       return reply.code(400).send({ error: (err as Error).message })
@@ -165,8 +182,10 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
 
   // POST /api/v1/rhythmic/escrow/:id/reverse — payer after expiry, or counterparty refusal
   app.post<{ Params: { id: string } }>('/escrow/:id/reverse', { preHandler: requireNodeAuth }, async (req, reply) => {
+    const did = callerDid(req, reply)
+    if (!did) return
     try {
-      return reply.send({ data: { ...(await service.reverse(req.params.id, callerDid(req))), testnet: true } })
+      return reply.send({ data: { ...(await service.reverse(req.params.id, did)), testnet: true } })
     } catch (err) {
       return reply.code(400).send({ error: (err as Error).message })
     }
@@ -175,8 +194,10 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
   // POST /api/v1/rhythmic/face/enroll — store template HASH with consent (never images)
   app.post('/face/enroll', { preHandler: [strict, requireNodeAuth] }, async (req: FastifyRequest, reply: FastifyReply) => {
     const body = FaceEnrollSchema.parse(req.body)
+    const did = callerDid(req, reply)
+    if (!did) return
     try {
-      await new RhythmicFaceService().enroll(callerDid(req), body.templateHash, body.consent)
+      await new RhythmicFaceService().enroll(did, body.templateHash, body.consent)
       return reply.code(201).send({ data: { enrolled: true, testnet: true } })
     } catch (err) {
       return reply.code(400).send({ error: (err as Error).message })
@@ -186,8 +207,10 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
   // POST /api/v1/rhythmic/face/verify — mint a 2-minute single-use assertion
   app.post('/face/verify', { preHandler: [strict, requireNodeAuth] }, async (req: FastifyRequest, reply: FastifyReply) => {
     const body = FaceVerifySchema.parse(req.body)
+    const did = callerDid(req, reply)
+    if (!did) return
     try {
-      const a = await new RhythmicFaceService().verify(callerDid(req), body.templateHash)
+      const a = await new RhythmicFaceService().verify(did, body.templateHash)
       return reply.send({ data: { ...a, testnet: true } })
     } catch (err) {
       return reply.code(401).send({ error: (err as Error).message })
@@ -211,11 +234,13 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
   // POST /api/v1/rhythmic/tap/submit — instant NXT transfer, face-gated over threshold
   app.post('/tap/submit', { preHandler: requireNodeAuth }, async (req: FastifyRequest, reply: FastifyReply) => {
     const body = TapSubmitSchema.parse(req.body)
+    const senderDid = callerDid(req, reply)
+    if (!senderDid) return
     try {
       return reply.send({
         data: {
           ...(await service.tapTransfer({
-            senderDid: callerDid(req),
+            senderDid,
             receiverDid: body.to,
             amountNxt: body.amountNXT,
             faceAssertionId: body.faceAssertionId,
@@ -233,7 +258,8 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
   // POST /api/v1/rhythmic/tap/sync-offline — settle queued offline taps (max 50, idempotent)
   app.post('/tap/sync-offline', { preHandler: requireNodeAuth }, async (req: FastifyRequest, reply: FastifyReply) => {
     const body = OfflineSyncSchema.parse(req.body)
-    const senderDid = callerDid(req)
+    const senderDid = callerDid(req, reply)
+    if (!senderDid) return
     const results = []
     for (const tap of body.taps) {
       try {

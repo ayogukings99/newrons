@@ -22,6 +22,19 @@ export function decodeDidKey(did: string): { algo: 'ed25519' | 'p256'; raw: Buff
   return null
 }
 
+/** Wrap raw 64-byte R||S into a DER SEQUENCE (liberal counterpart to the client's encoder). */
+export function derWrapECDSA(raw: Buffer): Buffer {
+  const norm = (v: Buffer): Buffer => {
+    let i = 0
+    while (i < v.length - 1 && v[i] === 0) i++
+    const s = v.subarray(i)
+    return s[0] & 0x80 ? Buffer.concat([Buffer.of(0), s]) : s
+  }
+  const r = norm(raw.subarray(0, 32))
+  const s = norm(raw.subarray(32, 64))
+  return Buffer.concat([Buffer.of(0x30, 4 + r.length + s.length, 0x02, r.length), r, Buffer.of(0x02, s.length), s])
+}
+
 export function verifyDidSignature(did: string, nonce: string, sigHex: string): boolean {
   try {
     const key = decodeDidKey(did)
@@ -46,7 +59,17 @@ export function verifyDidSignature(did: string, nonce: string, sigHex: string): 
       },
       format: 'jwk',
     })
-    return verify('sha256', data, pub, sig)
+    if (verify('sha256', data, pub, sig)) return true
+    // Fallback: older clients send WebCrypto raw R||S — wrap to DER and retry.
+    // The 64-byte length check keeps this unambiguous (never valid DER).
+    if (sig.length === 64) {
+      try {
+        return verify('sha256', data, pub, derWrapECDSA(sig))
+      } catch {
+        return false
+      }
+    }
+    return false
   } catch {
     return false
   }

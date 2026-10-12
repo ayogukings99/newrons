@@ -20,25 +20,43 @@ function TapInner() {
   const payload = `${typeof window !== 'undefined' ? window.location.origin : ''}/transfer/tap?to=${encodeURIComponent(to)}&amount=${encodeURIComponent(amount)}`;
 
   // Flush the offline outbox on load and on reconnect.
+  // High-value taps re-verify face from the stored template hash to mint a
+  // fresh assertion; taps with no hash are terminal-dropped with guidance
+  // instead of retrying forever.
   useEffect(() => {
     const flush = async () => {
       const token = sessionStorage.getItem('newrons.cap');
       const queued = outbox.all();
       if (!token || queued.length === 0) { setPending(queued.length); return; }
       try {
-        const { results } = await api.tapSyncOffline(token, queued.map((t) => ({
-          to: t.to, amountNXT: t.amountNxt, idempotencyKey: t.key, offlineCreatedAt: t.queuedAt,
-          // Face assertions expire in 2 min — offline longer needs a fresh lock.
-          faceAssertionId: undefined,
-        })));
+        const items = [];
+        for (const t of queued) {
+          let faceAssertionId: string | undefined;
+          if (t.amountNxt >= 50) {
+            if (!t.faceHash) {
+              outbox.remove(t.key);
+              setMsg('A queued tap needed face verification with no locked template — dropped. Resend it online.');
+              continue;
+            }
+            try {
+              faceAssertionId = (await api.faceVerify(token, t.faceHash)).assertionId;
+            } catch {
+              continue; // enrollment changed — keep queued, retry next reconnect
+            }
+          }
+          items.push({
+            to: t.to, amountNXT: t.amountNxt, idempotencyKey: t.key,
+            offlineCreatedAt: t.queuedAt, faceAssertionId,
+          });
+        }
+        if (items.length === 0) { setPending(outbox.all().length); return; }
+        const { results } = await api.tapSyncOffline(token, items);
         for (const r of results) {
           if (r.ok) outbox.remove(r.key);
         }
         setPending(outbox.all().length);
         if (results.some((r) => r.ok)) setMsg('Offline taps settled.');
-        const faceFails = results.filter((r) => !r.ok && /Face/i.test(r.error ?? ''));
-        if (faceFails.length) setMsg(`${faceFails.length} queued tap(s) need a fresh face lock (assertions expire).`);
-      } catch { setPending(queued.length); }
+      } catch { setPending(outbox.all().length); }
     };
     flush();
     window.addEventListener('online', flush);
