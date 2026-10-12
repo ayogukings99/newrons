@@ -13,10 +13,17 @@ not replaced. New surface is minimal:
   do not redefine.
 
 ## Vertical slices
-- VS1 (this branch): register → face → DID → avatar → ghost + language skeleton
-  + mirror placeholder + consent log.
-- VS2 (next): Solana-devnet Two-Stage Escrow (Anchor PDA) + credit mint on
-  escrow events + tap-to-transfer QR (NFC bonus, reuse nfc-payments routes).
+- VS1 (branch `phase-1/vs1-sovereign-entry`, PR pending): register → face →
+  DID → avatar → ghost + language skeleton + mirror placeholder + consent log.
+- VS2 (branch `phase-1/vs2-escrow-credit-tap`, this branch): Two-Stage Escrow
+  in NXT-reserve mode (`rhythmic_escrows` + `process_wallet_transfer`, same
+  pattern as SettlementBridgeService) + Civic Credit mint/slash
+  (`civic_credit_events` + `civic_credit_scores`, base 50) + tap-to-transfer
+  (QR-payload links + BarcodeDetector scan + 50-NXT face gate) + `requireNodeAuth`
+  (fixes VS1 bug where DID capability tokens were rejected by `requireAuth`).
+  Anchor program source ships in `contracts/escrow` (devnet deploy pending
+  toolchain — see its README). Migration 014 must be applied to Supabase
+  alongside the still-pending 013.
 - VS3: street-ready QR + face-threshold + offline queue (reuse sync-offline).
 - VS4: hardening (CSP, rate-limit tuning, WCAG pass, low-end Android, PWA offline).
 

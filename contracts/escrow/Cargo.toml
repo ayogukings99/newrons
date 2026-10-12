@@ -1,0 +1,18 @@
+[package]
+name = "newrons-escrow"
+version = "0.1.0"
+description = "Newrons Rhythmic OS Two-Stage Escrow (devnet)"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "newrons_escrow"
+
+[features]
+no-entrypoint = []
+no-idl = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.30.1"
