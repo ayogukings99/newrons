@@ -126,7 +126,7 @@ function TapInner() {
       </details>
       <br />
       <button onClick={submit}>Send →</button>
-      <p style={{ fontSize: 13 }}>{msg}</p>
+      <p aria-live="polite" style={{ fontSize: 13 }}>{msg}</p>
     </div>
   );
 }

@@ -30,6 +30,15 @@ not replaced. New surface is minimal:
   offline tap outbox (localStorage, idempotent flush via `tap/sync-offline`,
   cap 50, face re-lock needed after expiry); live Mirror aggregates
   (`GET /mirror`, Ghost-safe counts only). Migration 015 pending with 013/014.
+- VS4 (branch `phase-1/vs4-hardening`, this branch): exit-criteria hardening —
+  real Ed25519/P-256 challenge-signature verify (closes the VS2 stub);
+  tiered rate limits (120/min backstop, 10/min on challenge/verify/face);
+  API security headers + app CSP/Permissions-Policy (camera self-only);
+  offline service worker (shell only, never API/secrets); skip link,
+  focus-visible rings, live-region status, viewport+theme meta.
+  First load ~107 kB (inside the low-end budget). Migrations 013–015 still
+  await Supabase application; in-memory limits/nonces/assertions need Redis
+  pre-production; device/camera + screen-reader pass still owed on hardware.
 - VS3: street-ready QR + face-threshold + offline queue (reuse sync-offline).
 - VS4: hardening (CSP, rate-limit tuning, WCAG pass, low-end Android, PWA offline).
 

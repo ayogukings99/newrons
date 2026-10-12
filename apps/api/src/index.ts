@@ -20,6 +20,7 @@ import knowledgeBasesRoutes from './routes/knowledge-bases'
 import quizzesRoutes from './routes/quizzes'
 import integrationRoutes from './routes/integration'
 import rhythmicRoutes from './routes/rhythmic'
+import { securityHeaders } from './middleware/security-headers'
 
 const app = Fastify({ logger: { level: config.LOG_LEVEL } })
 
@@ -31,6 +32,9 @@ app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024 } }) // 100MB
 if (!process.env.VERCEL) {
   app.register(websocket)
 }
+
+// Security headers on every response (VS4 hardening)
+app.addHook('onSend', securityHeaders)
 
 // Routes — v1
 const API_PREFIX = '/api/v1'

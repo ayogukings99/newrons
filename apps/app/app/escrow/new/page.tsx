@@ -34,7 +34,7 @@ export default function NewEscrow() {
       </label>
       <br /><br />
       <button onClick={create}>Lock funds →</button>
-      <p style={{ fontSize: 13 }}>{msg}</p>
+      <p aria-live="polite" style={{ fontSize: 13 }}>{msg}</p>
     </div>
   );
 }

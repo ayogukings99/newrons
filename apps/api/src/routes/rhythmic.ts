@@ -5,6 +5,7 @@ import { requireNodeAuth } from '../middleware/node-auth'
 import { RhythmicEscrowService } from '../services/rhythmic-escrow.service'
 import { RhythmicFaceService } from '../services/rhythmic-face.service'
 import { FACE_THRESHOLD_NXT } from '../services/rhythmic-escrow.logic'
+import { verifyDidSignature } from '../services/did-verify'
 
 // Rhythmic OS Phase-1 routes (VS1 sovereign entry + VS2 escrow/credit/tap).
 // Testnet only. Value moves via process_wallet_transfer in NXT-reserve mode;
@@ -72,10 +73,15 @@ function callerDid(req: FastifyRequest): string {
 }
 
 export default async function rhythmicRoutes(app: FastifyInstance) {
-  app.addHook('preHandler', createRateLimit(60, 60_000))
+  // Tiered limits: generous backstop for reads, strict 10/min on
+  // challenge/verify/face (anti-enumeration + anti-brute-force).
+  // NOTE: in-memory per instance — resets on serverless cold start.
+  // Move to Redis before production.
+  app.addHook('preHandler', createRateLimit(120, 60_000))
+  const strict = createRateLimit(10, 60_000)
 
   // POST /api/v1/rhythmic/challenge — issue a DID-ownership nonce
-  app.post('/challenge', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/challenge', { preHandler: strict }, async (req: FastifyRequest, reply: FastifyReply) => {
     const { did } = ChallengeSchema.parse(req.body)
     const nonce = crypto.randomUUID()
     nonces.set(nonce, { did, expiresAt: Date.now() + 5 * 60_000 })
@@ -83,15 +89,16 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
   })
 
   // POST /api/v1/rhythmic/verify — verify DID signature, mint capability token
-  app.post('/verify', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/verify', { preHandler: strict }, async (req: FastifyRequest, reply: FastifyReply) => {
     const { did, sig, nonce } = VerifySchema.parse(req.body)
     const entry = nonces.get(nonce)
     if (!entry || entry.did !== did || Date.now() > entry.expiresAt) {
       return reply.code(401).send({ error: 'Stale or unknown challenge — request a new nonce' })
     }
     nonces.delete(nonce)
-    // TODO(VS3): real ed25519 verify of `sig` over nonce with the DID pubkey.
-    void sig
+    if (!verifyDidSignature(did, nonce, sig)) {
+      return reply.code(401).send({ error: 'Invalid DID signature — sign the nonce with your node key' })
+    }
     const token = app.jwt.sign({ sub: did }, { expiresIn: '5m' })
     return reply.send({ data: { did, capabilityToken: token, testnet: true } })
   })
@@ -166,7 +173,7 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
   })
 
   // POST /api/v1/rhythmic/face/enroll — store template HASH with consent (never images)
-  app.post('/face/enroll', { preHandler: requireNodeAuth }, async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/face/enroll', { preHandler: [strict, requireNodeAuth] }, async (req: FastifyRequest, reply: FastifyReply) => {
     const body = FaceEnrollSchema.parse(req.body)
     try {
       await new RhythmicFaceService().enroll(callerDid(req), body.templateHash, body.consent)
@@ -177,7 +184,7 @@ export default async function rhythmicRoutes(app: FastifyInstance) {
   })
 
   // POST /api/v1/rhythmic/face/verify — mint a 2-minute single-use assertion
-  app.post('/face/verify', { preHandler: requireNodeAuth }, async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/face/verify', { preHandler: [strict, requireNodeAuth] }, async (req: FastifyRequest, reply: FastifyReply) => {
     const body = FaceVerifySchema.parse(req.body)
     try {
       const a = await new RhythmicFaceService().verify(callerDid(req), body.templateHash)
