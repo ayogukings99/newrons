@@ -19,6 +19,7 @@ import securityRoutes from './routes/security'
 import knowledgeBasesRoutes from './routes/knowledge-bases'
 import quizzesRoutes from './routes/quizzes'
 import integrationRoutes from './routes/integration'
+import rhythmicRoutes from './routes/rhythmic'
 
 const app = Fastify({ logger: { level: config.LOG_LEVEL } })
 
@@ -44,6 +45,9 @@ app.register(quizzesRoutes,       { prefix: `${API_PREFIX}/quizzes` })
 
 // Integration layer — bridges social + economic identity
 app.register(integrationRoutes,   { prefix: `${API_PREFIX}/integration` })
+
+// Rhythmic OS Phase-1 — sovereign entry + escrow skeleton (testnet)
+app.register(rhythmicRoutes,      { prefix: `${API_PREFIX}/rhythmic` })
 
 // Health
 app.get('/health', async () => ({ status: 'ok', version: '0.1.0', project: 'NEXUS' }))
