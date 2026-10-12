@@ -39,6 +39,14 @@ not replaced. New surface is minimal:
   First load ~107 kB (inside the low-end budget). Migrations 013–015 still
   await Supabase application; in-memory limits/nonces/assertions need Redis
   pre-production; device/camera + screen-reader pass still owed on hardware.
+  Post-review fixes (on this branch): b58 leading-zero-only encoding, P-256
+  DER wire format (+ server raw fallback), per-instance limiter stores with
+  DID-aware keys and sweeps, 403 (not 500) for DID-less callers,
+  consume-assertion-after-settlement, offline face re-verify at flush,
+  SW GET guard, localhost HSTS exemption. 013 left untouched deliberately:
+  its REFERENCES users(id) follow the repo-wide 001–012 convention
+  (public.users is a bootstrap table); pointing 013 at auth.users(id)
+  would type-mismatch (BIGINT vs UUID) and orphan the identity bridges.
 - VS3: street-ready QR + face-threshold + offline queue (reuse sync-offline).
 - VS4: hardening (CSP, rate-limit tuning, WCAG pass, low-end Android, PWA offline).
 
