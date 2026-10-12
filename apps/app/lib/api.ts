@@ -1,5 +1,5 @@
 // Thin client for apps/api rhythmic routes. Base URL via env; testnet only.
-const BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api/v1/rhythmic';
+export const BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api/v1/rhythmic';
 
 async function j<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(`${BASE}${path}`, { headers: { 'content-type': 'application/json' }, ...init });
@@ -36,6 +36,13 @@ export const api = {
     j<EscrowView>(`/escrow/${id}/reverse`, { method: 'POST', headers: auth(token) }),
   tapQuote: (token: string, to: string, amountNXT: number) =>
     j<{ requiresFace: boolean }>(`/tap/quote`, { method: 'POST', headers: auth(token), body: JSON.stringify({ to, amountNXT }) }),
-  tapSubmit: (token: string, to: string, amountNXT: number, faceAssertionId?: string) =>
-    j<{ ok: boolean }>(`/tap/submit`, { method: 'POST', headers: auth(token), body: JSON.stringify({ to, amountNXT, faceAssertionId }) }),
+  tapSubmit: (token: string, to: string, amountNXT: number, faceAssertionId?: string, idempotencyKey?: string, offlineCreatedAt?: string) =>
+    j<{ ok: boolean; duplicate: boolean }>(`/tap/submit`, { method: 'POST', headers: auth(token), body: JSON.stringify({ to, amountNXT, faceAssertionId, idempotencyKey, offlineCreatedAt }) }),
+  tapSyncOffline: (token: string, taps: { to: string; amountNXT: number; faceAssertionId?: string; idempotencyKey: string; offlineCreatedAt: string }[]) =>
+    j<{ results: { key: string; ok: boolean; error?: string }[] }>(`/tap/sync-offline`, { method: 'POST', headers: auth(token), body: JSON.stringify({ taps }) }),
+  faceEnroll: (token: string, templateHash: string) =>
+    j<{ enrolled: boolean }>(`/face/enroll`, { method: 'POST', headers: auth(token), body: JSON.stringify({ templateHash, consent: true }) }),
+  faceVerify: (token: string, templateHash: string) =>
+    j<{ assertionId: string; expiresAt: string }>(`/face/verify`, { method: 'POST', headers: auth(token), body: JSON.stringify({ templateHash }) }),
+  mirror: () => j<{ escrows: Record<string, number>; creditAvg: number; creditNodes: number; taps: number; tapVolumeNxt: number }>(`/mirror`),
 };

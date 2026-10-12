@@ -1,8 +1,9 @@
 import { supabaseAdmin } from '../lib/supabase'
+import { RhythmicFaceService } from './rhythmic-face.service'
 import {
   EscrowKind, EscrowState, CREDIT_BASE, CREDIT_RELEASE_REWARD, CREDIT_DISPUTE_SLASH,
-  PAIR_CYCLE_LIMIT, applyCredit, assertPhase1Kind, assertTransition, isRapidCycling,
-  newEscrowKey,
+  FACE_THRESHOLD_NXT, PAIR_CYCLE_LIMIT, applyCredit, assertPhase1Kind, assertTransition,
+  isRapidCycling, newEscrowKey,
 } from './rhythmic-escrow.logic'
 
 // Rhythmic escrow service — NXT-reserve mode (ESCROW_MODE=nxt-reserve).
@@ -178,13 +179,23 @@ export class RhythmicEscrowService {
 
   async tapTransfer(params: {
     senderDid: string; receiverDid: string; amountNxt: number; faceAssertionId?: string;
-  }): Promise<{ ok: boolean; requiresFace: boolean }> {
-    const FACE_THRESHOLD_NXT = 50
+    idempotencyKey?: string; offlineCreatedAt?: string;
+  }): Promise<{ ok: boolean; requiresFace: boolean; duplicate: boolean }> {
     const requiresFace = params.amountNxt >= FACE_THRESHOLD_NXT
-    if (requiresFace && !params.faceAssertionId) {
-      throw new Error('Face assertion required at or above 50 NXT')
+    if (requiresFace) {
+      // Server-issued, single-use assertion — client strings are NOT trusted.
+      if (!params.faceAssertionId) throw new Error('Face assertion required at or above 50 NXT')
+      new RhythmicFaceService().consume(params.faceAssertionId, params.senderDid)
     }
     if (params.senderDid === params.receiverDid) throw new Error('Self-transfer is forbidden')
+
+    // Idempotency: offline-queued retries settle exactly once.
+    if (params.idempotencyKey) {
+      const { data: seen } = await supabaseAdmin
+        .from('rhythmic_tap_log').select('id').eq('idempotency_key', params.idempotencyKey).maybeSingle()
+      if (seen) return { ok: true, requiresFace, duplicate: true }
+    }
+
     const senderId = await resolveDidToUserId(params.senderDid)
     const receiverId = await resolveDidToUserId(params.receiverDid)
     if (!senderId || !receiverId) throw new Error('Both DIDs must be registered nodes')
@@ -196,8 +207,37 @@ export class RhythmicEscrowService {
       p_type: 'rhythmic_tap_transfer',
     })
     if (error) throw new Error(`Tap transfer failed: ${error.message}`)
+
+    await supabaseAdmin.from('rhythmic_tap_log').insert({
+      idempotency_key: params.idempotencyKey ?? `live_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      sender_did: params.senderDid,
+      receiver_did: params.receiverDid,
+      amount_nxt: params.amountNxt,
+      offline_created_at: params.offlineCreatedAt ?? null,
+    })
     await this.mintCredit(params.senderDid, 0, 'tap_transfer', null)
-    return { ok: true, requiresFace }
+    return { ok: true, requiresFace, duplicate: false }
+  }
+
+  /** Ghost-safe aggregates only — no DIDs, no per-node data. */
+  async mirrorStats(): Promise<{
+    escrows: Record<string, number>; creditAvg: number; creditNodes: number;
+    taps: number; tapVolumeNxt: number;
+  }> {
+    const { data: escrows } = await supabaseAdmin.from('rhythmic_escrows').select('state')
+    const counts: Record<string, number> = {}
+    for (const e of (escrows ?? []) as { state: string }[]) counts[e.state] = (counts[e.state] ?? 0) + 1
+    const { data: scores } = await supabaseAdmin.from('civic_credit_scores').select('score')
+    const nums = ((scores ?? []) as { score: number }[]).map((s) => s.score)
+    const { data: taps } = await supabaseAdmin.from('rhythmic_tap_log').select('amount_nxt')
+    const vols = ((taps ?? []) as { amount_nxt: string }[]).map((t) => Number(t.amount_nxt))
+    return {
+      escrows: counts,
+      creditAvg: nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : CREDIT_BASE,
+      creditNodes: nums.length,
+      taps: vols.length,
+      tapVolumeNxt: vols.reduce((a, b) => a + b, 0),
+    }
   }
 
   async creditView(did: string): Promise<CreditView> {
