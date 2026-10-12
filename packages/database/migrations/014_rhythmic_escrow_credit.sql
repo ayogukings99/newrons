@@ -55,3 +55,38 @@ CREATE TABLE IF NOT EXISTS civic_credit_scores (
   score      INT NOT NULL DEFAULT 50 CHECK (score BETWEEN 0 AND 100),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ── ROW LEVEL SECURITY (follows 013 conventions) ─────────────────────────────
+-- Writes stay service-role-only (API enforces the escrow state machine and
+-- mints credit); authenticated clients get read-own-rows for their own UX.
+-- service_role bypasses RLS, so API settlement is unaffected.
+
+ALTER TABLE rhythmic_escrows ENABLE ROW LEVEL SECURITY;
+ALTER TABLE civic_credit_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE civic_credit_scores ENABLE ROW LEVEL SECURITY;
+
+GRANT SELECT ON rhythmic_escrows TO authenticated;
+GRANT SELECT ON civic_credit_events TO authenticated;
+GRANT SELECT ON civic_credit_scores TO authenticated;
+
+DROP POLICY IF EXISTS "users_see_own_escrows" ON rhythmic_escrows;
+CREATE POLICY "users_see_own_escrows"
+  ON rhythmic_escrows FOR SELECT TO authenticated
+  USING (
+    payer_did IN (SELECT did FROM node_identities WHERE user_id = (SELECT id FROM users WHERE auth_id = auth.uid()))
+    OR counterparty_did IN (SELECT did FROM node_identities WHERE user_id = (SELECT id FROM users WHERE auth_id = auth.uid()))
+  );
+
+DROP POLICY IF EXISTS "users_see_own_credit_events" ON civic_credit_events;
+CREATE POLICY "users_see_own_credit_events"
+  ON civic_credit_events FOR SELECT TO authenticated
+  USING (
+    did IN (SELECT did FROM node_identities WHERE user_id = (SELECT id FROM users WHERE auth_id = auth.uid()))
+  );
+
+DROP POLICY IF EXISTS "users_see_own_credit_score" ON civic_credit_scores;
+CREATE POLICY "users_see_own_credit_score"
+  ON civic_credit_scores FOR SELECT TO authenticated
+  USING (
+    did IN (SELECT did FROM node_identities WHERE user_id = (SELECT id FROM users WHERE auth_id = auth.uid()))
+  );
